@@ -22,7 +22,9 @@ Buckett is a free, open alternative to paid closed-source R2 clients: your crede
 - **Transfers view** — filterable queue (queued / active / completed / failed) with live speed, multipart part progress, retry/resume, and share-link or reveal-in-Finder actions.
 - **Multiple accounts** — manage any number of R2 and B2 accounts and switch between them from the sidebar.
 - **Local-only encrypted credential storage** — secret keys are stored exclusively in the macOS Keychain (encrypted at rest by the OS). No telemetry, no third-party servers, no license checks.
-- **Update checks** — optional check against GitHub Releases at launch, plus "Check for Updates…" in the app menu.
+- **One-click updates** — optional check against GitHub Releases at launch plus "Check for Updates…" in the app menu; installing an update downloads, swaps the app in place, and relaunches automatically.
+- **Themes** — six accent themes and a System/Light/Dark appearance override (Settings → Appearance).
+- **Menu bar drop target** — drag files onto the bucket icon in the menu bar to upload them instantly (with a little drop-into-the-bucket animation); pick the target bucket from the icon's menu.
 
 ## Installation
 

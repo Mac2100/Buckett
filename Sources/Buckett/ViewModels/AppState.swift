@@ -1,3 +1,4 @@
+import AppKit
 import Combine
 import Foundation
 import SwiftUI
@@ -9,6 +10,8 @@ enum SidebarSelection: Hashable {
 
 @MainActor
 final class AppState: ObservableObject {
+    static let shared = AppState()
+
     let accountStore = AccountStore()
     let transfers = TransferManager()
     let updates = UpdateChecker()
@@ -122,6 +125,62 @@ final class AppState: ObservableObject {
         guard let client = currentClient else { return }
         try await client.createBucket(name)
         await loadBuckets()
+    }
+
+    // MARK: - Menu bar drops
+
+    func openMainWindow() {
+        NSApp.activate(ignoringOtherApps: true)
+        for window in NSApp.windows where window.canBecomeKey {
+            window.makeKeyAndOrderFront(nil)
+        }
+    }
+
+    /// Queues uploads dropped on the menu bar icon. Returns the target bucket
+    /// name, or nil (with user-facing feedback) when there is nowhere to upload.
+    @discardableResult
+    func handleMenuBarDrop(urls: [URL]) -> String? {
+        guard let account = selectedAccount, let client = client(for: account) else {
+            openMainWindow()
+            ToastCenter.shared.show(
+                "No account configured",
+                detail: "Add an account before dropping files.",
+                style: .error
+            )
+            return nil
+        }
+
+        var bucket: String?
+        if let stored = UserDefaults.standard.string(forKey: MenuBarController.targetBucketKey),
+           buckets.contains(where: { $0.name == stored }) {
+            bucket = stored
+        } else if case .bucket(let current) = sidebarSelection {
+            bucket = current
+        } else {
+            bucket = buckets.first?.name
+        }
+        guard let bucket else {
+            openMainWindow()
+            ToastCenter.shared.show(
+                "No bucket available",
+                detail: "Create a bucket, then drop files again.",
+                style: .error
+            )
+            return nil
+        }
+
+        let transfers = self.transfers
+        Task {
+            let expanded = await Task.detached(priority: .userInitiated) {
+                BrowserModel.expandForUpload(urls: urls)
+            }.value
+            for (fileURL, suffix) in expanded {
+                transfers.enqueueUpload(
+                    fileURL: fileURL, bucket: bucket, key: suffix, client: client
+                )
+            }
+        }
+        return bucket
     }
 
     // MARK: - Analytics

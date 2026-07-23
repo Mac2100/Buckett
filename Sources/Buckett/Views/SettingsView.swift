@@ -5,6 +5,8 @@ struct SettingsView: View {
         TabView {
             AccountsSettingsView()
                 .tabItem { Label("Accounts", systemImage: "person.crop.circle") }
+            AppearanceSettingsView()
+                .tabItem { Label("Appearance", systemImage: "paintpalette") }
             GeneralSettingsView()
                 .tabItem { Label("General", systemImage: "gearshape") }
             UpdatesSettingsView()
@@ -17,10 +19,12 @@ struct SettingsView: View {
 }
 
 struct AboutSettingsView: View {
+    @Environment(\.appTheme) private var theme
+
     var body: some View {
         VStack(spacing: 12) {
             Spacer()
-            Brand.glyph(size: 64)
+            theme.glyph(size: 64)
             Text("Buckett")
                 .font(.title.weight(.bold))
             Text("Version \(AppVersion.current)")
@@ -284,11 +288,80 @@ struct AccountEditorView: View {
     }
 }
 
+// MARK: - Appearance
+
+struct AppearanceSettingsView: View {
+    @EnvironmentObject private var themeStore: ThemeStore
+
+    private let swatchColumns = [GridItem(.adaptive(minimum: 108, maximum: 150), spacing: 12)]
+
+    var body: some View {
+        Form {
+            Picker("Appearance", selection: $themeStore.appearance) {
+                ForEach(AppearanceMode.allCases) { mode in
+                    Text(mode.label).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            Section("Theme") {
+                LazyVGrid(columns: swatchColumns, spacing: 12) {
+                    ForEach(Themes.all) { theme in
+                        themeSwatch(theme)
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private func themeSwatch(_ theme: AppTheme) -> some View {
+        let isSelected = themeStore.themeID == theme.id
+        return Button {
+            withAnimation(.snappy(duration: 0.15)) {
+                themeStore.themeID = theme.id
+            }
+        } label: {
+            VStack(spacing: 8) {
+                Circle()
+                    .fill(theme.gradient)
+                    .frame(width: 38, height: 38)
+                    .overlay {
+                        if isSelected {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(.white)
+                        }
+                    }
+                Text(theme.name)
+                    .font(.callout)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(isSelected ? theme.primary.opacity(0.1) : Color.primary.opacity(0.03))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(
+                        isSelected ? theme.primary.opacity(0.7) : Color.primary.opacity(0.07),
+                        lineWidth: isSelected ? 1.5 : 1
+                    )
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 // MARK: - General
 
 struct GeneralSettingsView: View {
     @AppStorage("defaultViewMode") private var defaultViewMode = ViewMode.grid.rawValue
     @AppStorage("maxConcurrentTransfers") private var maxConcurrentTransfers = 3
+    @AppStorage("showMenuBarIcon") private var showMenuBarIcon = true
 
     var body: some View {
         Form {
@@ -299,6 +372,15 @@ struct GeneralSettingsView: View {
             }
             Stepper(value: $maxConcurrentTransfers, in: 1...8) {
                 LabeledContent("Concurrent transfers", value: "\(maxConcurrentTransfers)")
+            }
+            Section {
+                Toggle("Show menu bar drop target", isOn: $showMenuBarIcon)
+                    .onChange(of: showMenuBarIcon) { _, visible in
+                        MenuBarController.shared.setVisible(visible)
+                    }
+                Text("Drag files onto the bucket icon in the menu bar to upload them instantly. Right there in the icon's menu you can pick which bucket drops go to.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             Text("Uploads of 16 MB or more automatically use resumable multipart uploads. Interrupted uploads resume from the last completed part when retried.")
                 .font(.caption)
@@ -330,40 +412,79 @@ struct UpdatesSettingsView: View {
 
 struct UpdateStatusView: View {
     @ObservedObject var updates: UpdateChecker
+    @ObservedObject private var updater = SelfUpdater.shared
 
     var body: some View {
-        HStack(spacing: 10) {
-            Button {
-                Task { await updates.check() }
-            } label: {
-                if updates.status == .checking {
-                    ProgressView().controlSize(.small)
-                } else {
-                    Text("Check Now")
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                Button {
+                    Task { await updates.check() }
+                } label: {
+                    if updates.status == .checking {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Text("Check Now")
+                    }
+                }
+                .disabled(updates.status == .checking || updater.isBusy)
+
+                switch updates.status {
+                case .idle, .checking:
+                    EmptyView()
+                case .upToDate:
+                    Label("You're up to date", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                case .noReleasesVisible:
+                    Label(
+                        "No releases visible — private repositories can't be checked anonymously",
+                        systemImage: "eye.slash"
+                    )
+                    .foregroundStyle(.orange)
+                case .updateAvailable(let version, let url):
+                    Label("Version \(version) is available", systemImage: "arrow.down.circle.fill")
+                        .foregroundStyle(.blue)
+                    Button("Install & Relaunch") {
+                        SelfUpdater.shared.install(from: url)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(updater.isBusy)
+                case .failed(let message):
+                    Label(message, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                        .lineLimit(2)
+                }
+                Spacer()
+                if let lastChecked = updates.lastChecked {
+                    Text("Last checked \(lastChecked.formatted(date: .omitted, time: .shortened))")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
                 }
             }
-            .disabled(updates.status == .checking)
 
-            switch updates.status {
-            case .idle, .checking:
+            switch updater.phase {
+            case .idle:
                 EmptyView()
-            case .upToDate:
-                Label("You're up to date", systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-            case .updateAvailable(let version, let url):
-                Label("Version \(version) is available", systemImage: "arrow.down.circle.fill")
-                    .foregroundStyle(.blue)
-                Button("Download") { NSWorkspace.shared.open(url) }
+            case .downloading:
+                Label {
+                    Text("Downloading update…")
+                } icon: {
+                    ProgressView().controlSize(.small)
+                }
+                .foregroundStyle(.secondary)
+            case .installing:
+                Label {
+                    Text("Installing…")
+                } icon: {
+                    ProgressView().controlSize(.small)
+                }
+                .foregroundStyle(.secondary)
+            case .relaunching:
+                Label("Relaunching…", systemImage: "arrow.triangle.2.circlepath")
+                    .foregroundStyle(.secondary)
             case .failed(let message):
-                Label(message, systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
+                Label(message, systemImage: "xmark.circle.fill")
+                    .foregroundStyle(.red)
                     .lineLimit(2)
-            }
-            Spacer()
-            if let lastChecked = updates.lastChecked {
-                Text("Last checked \(lastChecked.formatted(date: .omitted, time: .shortened))")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
             }
         }
     }

@@ -104,12 +104,15 @@ struct UpdateAlertHost: View {
             .frame(width: 0, height: 0)
             .alert("Update Available", isPresented: isPresented) {
                 if case .updateAvailable(_, let url) = updates.status {
-                    Button("Download") { NSWorkspace.shared.open(url) }
+                    Button("Install & Relaunch") {
+                        SelfUpdater.shared.install(from: url)
+                    }
+                    Button("Download in Browser") { NSWorkspace.shared.open(url) }
                 }
                 Button("Later", role: .cancel) {}
             } message: {
                 if case .updateAvailable(let version, _) = updates.status {
-                    Text("Buckett \(version) is available. You are running \(AppVersion.current).")
+                    Text("Buckett \(version) is available. You are running \(AppVersion.current). Install now and the app will relaunch into the new version.")
                 }
             }
     }
@@ -119,11 +122,12 @@ struct UpdateAlertHost: View {
 
 struct WelcomeView: View {
     @EnvironmentObject private var appState: AppState
+    @Environment(\.appTheme) private var theme
 
     var body: some View {
         VStack(spacing: 0) {
             Spacer()
-            Brand.glyph(size: 84)
+            theme.glyph(size: 84)
                 .padding(.bottom, 22)
 
             Text("Welcome to Buckett")
@@ -165,7 +169,7 @@ struct WelcomeView: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
-            .tint(Brand.indigo)
+            .tint(theme.primary)
             .padding(.top, 36)
 
             Text("Just a few steps to get started")
@@ -181,7 +185,7 @@ struct WelcomeView: View {
         VStack(spacing: 10) {
             Image(systemName: symbol)
                 .font(.system(size: 26))
-                .foregroundStyle(Brand.gradient)
+                .foregroundStyle(theme.gradient)
             Text(title)
                 .font(.headline)
             Text(detail)

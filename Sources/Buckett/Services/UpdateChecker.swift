@@ -10,6 +10,9 @@ final class UpdateChecker: ObservableObject {
         case idle
         case checking
         case upToDate
+        /// GitHub answered 404: either no release exists yet, or the repository
+        /// is private and anonymous API calls cannot see its releases.
+        case noReleasesVisible
         case updateAvailable(version: String, url: URL)
         case failed(String)
     }
@@ -47,8 +50,7 @@ final class UpdateChecker: ObservableObject {
                 throw URLError(.badServerResponse)
             }
             if http.statusCode == 404 {
-                // No releases published yet.
-                status = .upToDate
+                status = .noReleasesVisible
                 return
             }
             guard http.statusCode == 200 else {
