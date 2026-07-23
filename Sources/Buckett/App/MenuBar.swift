@@ -280,7 +280,7 @@ final class DropAnimationController {
         panel = newPanel
 
         Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 2_600_000_000)
+            try? await Task.sleep(nanoseconds: 2_100_000_000)
             guard let self, self.panel === newPanel else { return }
             newPanel.close()
             self.panel = nil
@@ -362,7 +362,7 @@ struct HoverDropView: View {
         )
         .shadow(color: .black.opacity(0.2), radius: 14, y: 5)
         .onAppear {
-            withAnimation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true)) {
+            withAnimation(.easeInOut(duration: 0.32).repeatForever(autoreverses: true)) {
                 pulsing = true
             }
         }
@@ -435,18 +435,18 @@ struct DropAnimationView: View {
         .shadow(color: .black.opacity(0.2), radius: 14, y: 5)
         .onAppear {
             // File falls into the bucket…
-            withAnimation(.easeIn(duration: 0.5).delay(0.15)) {
+            withAnimation(.easeIn(duration: 0.38).delay(0.03)) {
                 dropped = true
             }
             // …the bucket squashes on impact and springs back…
             Task {
-                try? await Task.sleep(nanoseconds: 620_000_000)
-                withAnimation(.easeOut(duration: 0.1)) { squashed = true }
-                try? await Task.sleep(nanoseconds: 110_000_000)
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.4)) { squashed = false }
+                try? await Task.sleep(nanoseconds: 400_000_000)
+                withAnimation(.easeOut(duration: 0.09)) { squashed = true }
+                try? await Task.sleep(nanoseconds: 100_000_000)
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.4)) { squashed = false }
             }
             // …and the label fades in.
-            withAnimation(.easeOut(duration: 0.3).delay(0.8)) {
+            withAnimation(.easeOut(duration: 0.25).delay(0.5)) {
                 showLabel = true
             }
         }

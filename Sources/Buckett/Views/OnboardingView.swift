@@ -187,6 +187,12 @@ struct OnboardingView: View {
                     "The part after “s3.” in your bucket's S3 endpoint."
                 )
                 labeledField("Region", text: $b2Region, prompt: "e.g. us-west-004")
+            case .amazonS3:
+                stepHeading(
+                    "AWS region",
+                    "The region your buckets live in."
+                )
+                labeledField("Region", text: $b2Region, prompt: "e.g. us-east-1")
             }
 
             labeledField(
@@ -216,12 +222,7 @@ struct OnboardingView: View {
 
     private var credentialsStep: some View {
         VStack(alignment: .leading, spacing: 16) {
-            stepHeading(
-                "API credentials",
-                provider == .cloudflareR2
-                    ? "Create an R2 API token with Admin Read & Write so Buckett can list your buckets."
-                    : "Create an App Key in the Backblaze console; the keyID is your Access Key ID."
-            )
+            stepHeading("API credentials", credentialsHint)
 
             labeledField("Access Key ID", text: $accessKeyID, prompt: "")
 
@@ -242,6 +243,17 @@ struct OnboardingView: View {
             )
             .font(.caption)
             .foregroundStyle(.secondary)
+        }
+    }
+
+    private var credentialsHint: String {
+        switch provider {
+        case .cloudflareR2:
+            return "Create an R2 API token with Admin Read & Write so Buckett can list your buckets."
+        case .backblazeB2:
+            return "Create an App Key in the Backblaze console; the keyID is your Access Key ID."
+        case .amazonS3:
+            return "Create an IAM access key with S3 permissions in the AWS console."
         }
     }
 

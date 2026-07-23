@@ -37,6 +37,9 @@ final class ToastCenter: ObservableObject {
     private init() {}
 
     func show(_ message: String, detail: String? = nil, style: Toast.Style = .success) {
+        if let enabled = UserDefaults.standard.object(forKey: "showToasts") as? Bool, !enabled {
+            return
+        }
         let toast = Toast(message: message, detail: detail, style: style)
         withAnimation(.spring(duration: 0.3)) {
             toasts.append(toast)

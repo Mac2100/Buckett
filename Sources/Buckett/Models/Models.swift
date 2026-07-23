@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 enum Provider: String, Codable, CaseIterable, Identifiable {
     case cloudflareR2 = "r2"
     case backblazeB2 = "b2"
+    case amazonS3 = "s3"
 
     var id: String { rawValue }
 
@@ -13,6 +14,7 @@ enum Provider: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .cloudflareR2: return "Cloudflare R2"
         case .backblazeB2: return "Backblaze B2"
+        case .amazonS3: return "Amazon S3"
         }
     }
 
@@ -20,6 +22,7 @@ enum Provider: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .cloudflareR2: return "R2"
         case .backblazeB2: return "B2"
+        case .amazonS3: return "S3"
         }
     }
 
@@ -27,6 +30,7 @@ enum Provider: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .cloudflareR2: return "cloud.fill"
         case .backblazeB2: return "flame.fill"
+        case .amazonS3: return "shippingbox.fill"
         }
     }
 
@@ -34,6 +38,7 @@ enum Provider: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .cloudflareR2: return URL(string: "https://dash.cloudflare.com/?to=/:account/r2")!
         case .backblazeB2: return URL(string: "https://secure.backblaze.com/b2_buckets.htm")!
+        case .amazonS3: return URL(string: "https://console.aws.amazon.com/iam/home#/security_credentials")!
         }
     }
 }
@@ -48,7 +53,8 @@ struct Account: Codable, Identifiable, Hashable {
     var provider: Provider = .cloudflareR2
     /// Cloudflare account ID (R2 only) — used to derive the endpoint.
     var cloudflareAccountID: String = ""
-    /// B2 region such as `us-west-004` — used to derive the endpoint.
+    /// Region for B2 (`us-west-004`) or Amazon S3 (`us-east-1`).
+    /// (Named for its original B2-only role; kept for stored-JSON compatibility.)
     var b2Region: String = ""
     /// Optional custom S3-compatible endpoint; overrides the derived one when set.
     var customEndpoint: String = ""
@@ -58,6 +64,7 @@ struct Account: Codable, Identifiable, Hashable {
         switch provider {
         case .cloudflareR2: return "auto"
         case .backblazeB2: return b2Region.isEmpty ? "us-west-004" : b2Region
+        case .amazonS3: return b2Region.isEmpty ? "us-east-1" : b2Region
         }
     }
 
@@ -78,6 +85,9 @@ struct Account: Codable, Identifiable, Hashable {
             let region = b2Region.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !region.isEmpty else { return nil }
             return URL(string: "https://s3.\(region).backblazeb2.com")
+        case .amazonS3:
+            let region = b2Region.trimmingCharacters(in: .whitespacesAndNewlines)
+            return URL(string: "https://s3.\(region.isEmpty ? "us-east-1" : region).amazonaws.com")
         }
     }
 

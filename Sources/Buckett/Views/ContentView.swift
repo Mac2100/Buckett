@@ -107,7 +107,6 @@ struct UpdateAlertHost: View {
                     Button("Install & Relaunch") {
                         SelfUpdater.shared.install(from: url)
                     }
-                    Button("Download in Browser") { NSWorkspace.shared.open(url) }
                 }
                 Button("Later", role: .cancel) {}
             } message: {

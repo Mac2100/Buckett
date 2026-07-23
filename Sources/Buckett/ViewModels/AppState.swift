@@ -31,6 +31,7 @@ final class AppState: ObservableObject {
 
     private var clientCache: [UUID: S3Client] = [:]
     private var cancellables: Set<AnyCancellable> = []
+    private var statsRefreshTasks: [String: Task<Void, Never>] = [:]
 
     init() {
         // Re-publish nested store changes so views observing AppState refresh
@@ -38,6 +39,16 @@ final class AppState: ObservableObject {
         accountStore.objectWillChange
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
+
+        // Refresh a bucket's stats shortly after uploads land in it.
+        NotificationCenter.default.addObserver(
+            forName: .buckettTransferCompleted, object: nil, queue: .main
+        ) { [weak self] notification in
+            guard let bucket = notification.userInfo?["bucket"] as? String else { return }
+            Task { @MainActor [weak self] in
+                self?.scheduleStatsRefresh(bucket: bucket)
+            }
+        }
 
         if let saved = UserDefaults.standard.string(forKey: "selectedAccountID"),
            let uuid = UUID(uuidString: saved),
@@ -114,6 +125,7 @@ final class AppState: ObservableObject {
         bucketsError = nil
         do {
             buckets = try await client.listBuckets()
+            autoAnalyzeAll()
         } catch {
             bucketsError = error.localizedDescription
             buckets = []
@@ -184,6 +196,11 @@ final class AppState: ObservableObject {
                     fileURL: fileURL, bucket: bucket, key: suffix, client: client
                 )
             }
+            Notifier.shared.post(
+                .dropStarted,
+                title: "Upload started",
+                body: "\(expanded.count) file\(expanded.count == 1 ? "" : "s") → \(bucket)"
+            )
         }
         return bucket
     }
@@ -191,16 +208,40 @@ final class AppState: ObservableObject {
     // MARK: - Analytics
 
     func analyze(bucket: String) {
+        Task { await analyzeNow(bucket: bucket) }
+    }
+
+    func analyzeNow(bucket: String) async {
         guard let client = currentClient, !analyzing.contains(bucket) else { return }
         analyzing.insert(bucket)
+        defer { analyzing.remove(bucket) }
+        do {
+            let objects = try await client.listAllObjects(bucket: bucket)
+            stats[bucket] = Self.computeStats(bucket: bucket, objects: objects)
+        } catch {
+            NSLog("Buckett: analyze failed for \(bucket): \(error.localizedDescription)")
+        }
+    }
+
+    /// Analyzes every bucket that has no stats yet or whose stats are older
+    /// than 15 minutes. Runs sequentially so large accounts aren't hammered.
+    func autoAnalyzeAll() {
+        let staleBefore = Date().addingTimeInterval(-15 * 60)
+        let names = buckets.map(\.name)
         Task {
-            defer { analyzing.remove(bucket) }
-            do {
-                let objects = try await client.listAllObjects(bucket: bucket)
-                stats[bucket] = Self.computeStats(bucket: bucket, objects: objects)
-            } catch {
-                bucketsError = "Analyze failed for \(bucket): \(error.localizedDescription)"
+            for name in names {
+                if let existing = stats[name], existing.analyzedAt > staleBefore { continue }
+                await analyzeNow(bucket: name)
             }
+        }
+    }
+
+    private func scheduleStatsRefresh(bucket: String) {
+        statsRefreshTasks[bucket]?.cancel()
+        statsRefreshTasks[bucket] = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            guard !Task.isCancelled else { return }
+            await self?.analyzeNow(bucket: bucket)
         }
     }
 
