@@ -8,7 +8,7 @@ struct ObjectGridView: View {
     let onOpen: (RemoteObject) -> Void
     let onContextAction: (ObjectAction, [RemoteObject]) -> Void
 
-    private let columns = [GridItem(.adaptive(minimum: 140, maximum: 200), spacing: 14)]
+    private let columns = [GridItem(.adaptive(minimum: 168, maximum: 230), spacing: 14)]
 
     var body: some View {
         ScrollView {
@@ -18,14 +18,10 @@ struct ObjectGridView: View {
                         object: object,
                         isSelected: model.selection.contains(object.id),
                         bucket: model.bucket,
-                        client: model.client
+                        client: model.client,
+                        onOpen: { onOpen(object) },
+                        onSelect: { select(object) }
                     )
-                    .onTapGesture(count: 2) {
-                        onOpen(object)
-                    }
-                    .onTapGesture {
-                        select(object)
-                    }
                     .contextMenu {
                         ObjectContextMenu(
                             objects: contextTargets(for: object),
@@ -34,7 +30,8 @@ struct ObjectGridView: View {
                     }
                 }
             }
-            .padding(14)
+            .padding(16)
+            .padding(.bottom, 56) // keep the selection bar clear of the last row
         }
         .onTapGesture {
             model.selection.removeAll()
@@ -54,7 +51,6 @@ struct ObjectGridView: View {
         }
     }
 
-    /// Right-clicking a selected item acts on the whole selection; otherwise just that item.
     private func contextTargets(for object: RemoteObject) -> [RemoteObject] {
         if model.selection.contains(object.id) {
             return model.selectedObjects
@@ -68,54 +64,108 @@ struct ObjectGridItem: View {
     let isSelected: Bool
     let bucket: String
     let client: S3Client
+    let onOpen: () -> Void
+    let onSelect: () -> Void
 
     @State private var thumbnail: NSImage?
+    @State private var hovering = false
 
     var body: some View {
-        VStack(spacing: 6) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.primary.opacity(0.045))
-                if let thumbnail {
-                    Image(nsImage: thumbnail)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 116, height: 84)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                } else {
-                    Image(systemName: object.symbolName)
-                        .font(.system(size: 34))
-                        .foregroundStyle(object.isFolder ? Color.accentColor : Color.secondary)
-                }
+        VStack(alignment: .leading, spacing: 0) {
+            thumbnailArea
+            VStack(alignment: .leading, spacing: 2) {
+                Text(object.name)
+                    .font(.callout.weight(.medium))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Text(subtitle)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
-            .frame(height: 84)
-
-            Text(object.name)
-                .font(.callout)
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
-                .truncationMode(.middle)
-
-            Text(object.isFolder ? "Folder" : object.formattedSize)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 9)
         }
-        .padding(8)
-        .frame(maxWidth: .infinity)
         .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(isSelected ? Color.accentColor.opacity(0.18) : Color.clear)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(isSelected ? Color.accentColor : Color.clear, lineWidth: 1.5)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(
+                    isSelected ? Color.accentColor : Color.primary.opacity(0.08),
+                    lineWidth: isSelected ? 2 : 1
+                )
         )
-        .contentShape(Rectangle())
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .shadow(color: .black.opacity(hovering ? 0.10 : 0.05), radius: hovering ? 8 : 4, y: 2)
+        .scaleEffect(hovering ? 1.012 : 1)
+        .animation(.easeOut(duration: 0.12), value: hovering)
+        .contentShape(RoundedRectangle(cornerRadius: 12))
+        .onHover { hovering = $0 }
+        .onTapGesture(count: 2) { onOpen() }
+        .onTapGesture { onSelect() }
         .task(id: object.id + (object.eTag ?? "")) {
             guard object.isImage else { return }
             thumbnail = await ThumbnailLoader.shared.thumbnail(
                 for: object, bucket: bucket, client: client
             )
+        }
+    }
+
+    private var subtitle: String {
+        if object.isFolder { return "Folder" }
+        if let date = object.lastModified {
+            return "\(object.formattedSize) · \(date.formatted(date: .numeric, time: .shortened))"
+        }
+        return object.formattedSize
+    }
+
+    private var thumbnailArea: some View {
+        ZStack {
+            Rectangle()
+                .fill(Color.primary.opacity(0.045))
+            if let thumbnail {
+                Image(nsImage: thumbnail)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } else {
+                Image(systemName: object.symbolName)
+                    .font(.system(size: 36))
+                    .foregroundStyle(
+                        object.isFolder ? AnyShapeStyle(Brand.gradient) : AnyShapeStyle(.secondary)
+                    )
+            }
+        }
+        .frame(height: 106)
+        .clipped()
+        .overlay(alignment: .topLeading) {
+            if isSelected {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 17))
+                    .foregroundStyle(.white, Color.accentColor)
+                    .padding(6)
+            }
+        }
+        .overlay(alignment: .bottomLeading) {
+            if !object.isFolder && object.size > 0 {
+                Text(object.formattedSize)
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(.black.opacity(0.55), in: Capsule())
+                    .padding(5)
+            }
+        }
+        .overlay {
+            if hovering {
+                Text(object.isFolder ? "Open folder" : "Preview")
+                    .font(.caption.weight(.medium))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(.regularMaterial, in: Capsule())
+                    .allowsHitTesting(false)
+            }
         }
     }
 }
@@ -198,9 +248,13 @@ struct ObjectContextMenu: View {
             if singleFile {
                 Button("Preview") { onAction(.preview, objects) }
                 Button("Get Info") { onAction(.metadata, objects) }
+                Button("Copy Share Link (7 days)") { onAction(.copyLink, objects) }
                 Divider()
             }
             Button("Download…") { onAction(.download, objects) }
+            if objects.contains(where: { !$0.isFolder }) {
+                Button("Move To…") { onAction(.move, objects) }
+            }
             if objects.count == 1 {
                 Button("Rename…") { onAction(.rename, objects) }
             }

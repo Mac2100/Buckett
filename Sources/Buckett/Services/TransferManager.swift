@@ -29,10 +29,34 @@ final class TransferTask: ObservableObject, Identifiable {
     let client: S3Client
 
     @Published var state: TransferState = .queued
-    @Published var transferredBytes: Int64 = 0
+    @Published var transferredBytes: Int64 = 0 {
+        didSet { updateSpeed() }
+    }
     @Published var totalBytes: Int64 = 0
+    /// Smoothed transfer rate in bytes/second while running.
+    @Published var bytesPerSecond: Double = 0
+    /// (current part, total parts) for multipart uploads.
+    @Published var partProgress: (Int, Int)?
 
     var runner: Task<Void, Never>?
+    private var lastSampleTime: Date?
+    private var lastSampleBytes: Int64 = 0
+
+    private func updateSpeed() {
+        let now = Date()
+        guard let last = lastSampleTime else {
+            lastSampleTime = now
+            lastSampleBytes = transferredBytes
+            return
+        }
+        let elapsed = now.timeIntervalSince(last)
+        guard elapsed >= 0.4 else { return }
+        let delta = Double(transferredBytes - lastSampleBytes)
+        let instant = max(0, delta / elapsed)
+        bytesPerSecond = bytesPerSecond == 0 ? instant : bytesPerSecond * 0.6 + instant * 0.4
+        lastSampleTime = now
+        lastSampleBytes = transferredBytes
+    }
 
     init(kind: Kind, bucket: String, key: String, localURL: URL, totalBytes: Int64 = 0, client: S3Client) {
         self.kind = kind
@@ -182,6 +206,7 @@ final class TransferManager: ObservableObject {
                     task.state = .completed
                     task.transferredBytes = task.totalBytes
                     if task.kind == .upload {
+                        UploadHistory.shared.record(bytes: task.totalBytes)
                         NotificationCenter.default.post(
                             name: .buckettTransferCompleted,
                             object: nil,
@@ -195,8 +220,14 @@ final class TransferManager: ObservableObject {
                 } catch {
                     task.state = .failed(error.localizedDescription)
                 }
+                task.bytesPerSecond = 0
+                task.partProgress = nil
                 self?.running -= 1
                 self?.pump()
+                if let self, self.activeCount == 0,
+                   self.tasks.contains(where: { $0.state == .completed }) {
+                    ToastCenter.shared.show("All transfers finished")
+                }
             }
         }
     }
@@ -291,6 +322,7 @@ final class TransferManager: ObservableObject {
         for part in 1...partCount {
             try Task.checkCancellation()
             if record.completedParts[String(part)] != nil { continue }
+            await MainActor.run { task.partProgress = (part, partCount) }
 
             let offset = Int64(part - 1) * partSize
             let length = Int(min(partSize, fileSize - offset))

@@ -9,8 +9,38 @@ struct SettingsView: View {
                 .tabItem { Label("General", systemImage: "gearshape") }
             UpdatesSettingsView()
                 .tabItem { Label("Updates", systemImage: "arrow.down.circle") }
+            AboutSettingsView()
+                .tabItem { Label("About", systemImage: "info.circle") }
         }
         .frame(width: 640, height: 460)
+    }
+}
+
+struct AboutSettingsView: View {
+    var body: some View {
+        VStack(spacing: 12) {
+            Spacer()
+            Brand.glyph(size: 64)
+            Text("Buckett")
+                .font(.title.weight(.bold))
+            Text("Version \(AppVersion.current)")
+                .foregroundStyle(.secondary)
+            Text("An open-source visual bucket explorer for\nCloudflare R2 and Backblaze B2.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            HStack(spacing: 16) {
+                Link("GitHub", destination: URL(string: "https://github.com/\(UpdateChecker.repo)")!)
+                Link("Releases", destination: UpdateChecker.releasesPage)
+                Link(
+                    "MIT License",
+                    destination: URL(string: "https://github.com/\(UpdateChecker.repo)/blob/main/LICENSE")!
+                )
+            }
+            .padding(.top, 6)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 

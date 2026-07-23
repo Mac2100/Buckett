@@ -420,6 +420,34 @@ final class S3Client {
         return meta
     }
 
+    /// Time-limited shareable URL for an object (SigV4 query-string auth).
+    func presignedURL(bucket: String, key: String, expires: TimeInterval) -> URL? {
+        guard var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false) else {
+            return nil
+        }
+        var path = components.percentEncodedPath
+        if path.hasSuffix("/") { path.removeLast() }
+        path += "/" + SigV4.encode(bucket) + "/" + SigV4.encode(key, keepSlash: true)
+        components.percentEncodedPath = path
+        guard let url = components.url else { return nil }
+        return SigV4.presign(
+            url: url,
+            credentials: credentials,
+            region: region,
+            expires: Int(expires)
+        )
+    }
+
+    /// True if an object with this exact key exists.
+    func objectExists(bucket: String, key: String) async throws -> Bool {
+        do {
+            _ = try await headObject(bucket: bucket, key: key)
+            return true
+        } catch let error as S3Error where error.status == 404 {
+            return false
+        }
+    }
+
     // MARK: - Multipart upload
 
     func createMultipartUpload(
