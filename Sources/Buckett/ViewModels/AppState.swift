@@ -26,6 +26,9 @@ final class AppState: ObservableObject {
     @Published var buckets: [Bucket] = []
     @Published var bucketsLoading = false
     @Published var bucketsError: String?
+    /// Bucket lists for every account (not just the selected one), so the
+    /// menu bar drop menu can offer buckets across accounts.
+    @Published var accountBuckets: [UUID: [Bucket]] = [:]
     @Published var stats: [String: BucketStats] = [:]
     @Published var analyzing: Set<String> = []
 
@@ -125,12 +128,38 @@ final class AppState: ObservableObject {
         bucketsError = nil
         do {
             buckets = try await client.listBuckets()
+            accountBuckets[account.id] = buckets
             autoAnalyzeAll()
         } catch {
             bucketsError = error.localizedDescription
             buckets = []
         }
         bucketsLoading = false
+        loadOtherAccountBuckets()
+    }
+
+    /// Background-refreshes bucket lists for accounts other than the selected
+    /// one, feeding the cross-account menu bar drop menu.
+    private func loadOtherAccountBuckets() {
+        for account in accountStore.accounts where account.id != selectedAccountID {
+            guard let client = client(for: account) else { continue }
+            let accountID = account.id
+            Task { [weak self] in
+                guard let list = try? await client.listBuckets() else { return }
+                self?.accountBuckets[accountID] = list
+            }
+        }
+    }
+
+    func bucketList(for accountID: UUID) -> [Bucket] {
+        if accountID == selectedAccountID, !buckets.isEmpty {
+            return buckets
+        }
+        return accountBuckets[accountID] ?? []
+    }
+
+    func isValidDropTarget(_ target: MenuDropTarget) -> Bool {
+        bucketList(for: target.accountID).contains { $0.name == target.bucket }
     }
 
     func createBucket(named name: String) async throws {
@@ -148,45 +177,51 @@ final class AppState: ObservableObject {
         }
     }
 
-    /// The bucket icon-drops go to by default: the first checked drop-menu
-    /// bucket, else the selected bucket, else the account's first bucket.
-    func menuBarTargetBucket() -> String? {
+    /// Where icon-drops go by default: the first checked drop-menu bucket (any
+    /// account), else the selected bucket, else the account's first bucket.
+    func menuBarAutoTarget() -> MenuDropTarget? {
         if let first = MenuBarController.dropShortlist()
-            .first(where: { name in buckets.contains { $0.name == name } }) {
+            .compactMap({ MenuDropTarget(encoded: $0) })
+            .first(where: { isValidDropTarget($0) }) {
             return first
         }
+        guard let selectedID = selectedAccountID else { return nil }
         if case .bucket(let current) = sidebarSelection {
-            return current
+            return MenuDropTarget(accountID: selectedID, bucket: current)
         }
-        return buckets.first?.name
+        if let first = buckets.first {
+            return MenuDropTarget(accountID: selectedID, bucket: first.name)
+        }
+        return nil
     }
 
     /// Queues uploads dropped on the menu bar icon (or one of the hover panel's
-    /// bucket rows, via `explicitBucket`). Returns the target bucket name, or
-    /// nil (with user-facing feedback) when there is nowhere to upload.
+    /// bucket rows, via `target` — which may belong to any account). Returns the
+    /// bucket name for the animation, or nil (with feedback) when there is
+    /// nowhere to upload.
     @discardableResult
-    func handleMenuBarDrop(urls: [URL], to explicitBucket: String? = nil) -> String? {
-        guard let account = selectedAccount, let client = client(for: account) else {
-            openMainWindow()
-            ToastCenter.shared.show(
-                "No account configured",
-                detail: "Add an account before dropping files.",
-                style: .error
-            )
-            return nil
-        }
-
-        let bucket = explicitBucket ?? menuBarTargetBucket()
-        guard let bucket else {
+    func handleMenuBarDrop(urls: [URL], to target: MenuDropTarget? = nil) -> String? {
+        guard let resolved = target ?? menuBarAutoTarget() else {
             openMainWindow()
             ToastCenter.shared.show(
                 "No bucket available",
-                detail: "Create a bucket, then drop files again.",
+                detail: "Add an account and create a bucket, then drop files again.",
+                style: .error
+            )
+            return nil
+        }
+        guard let account = accountStore.accounts.first(where: { $0.id == resolved.accountID }),
+              let client = client(for: account) else {
+            openMainWindow()
+            ToastCenter.shared.show(
+                "Missing credentials",
+                detail: "Re-enter the secret key for this account in Settings.",
                 style: .error
             )
             return nil
         }
 
+        let bucket = resolved.bucket
         let transfers = self.transfers
         Task {
             let expanded = await Task.detached(priority: .userInitiated) {

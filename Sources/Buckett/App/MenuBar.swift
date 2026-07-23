@@ -2,6 +2,39 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
+// MARK: - Drop targets (account + bucket)
+
+/// A drop destination that can live in ANY account, encoded for UserDefaults
+/// as "accountUUID|bucketName".
+struct MenuDropTarget: Hashable {
+    let accountID: UUID
+    let bucket: String
+
+    var encoded: String { "\(accountID.uuidString)|\(bucket)" }
+
+    init(accountID: UUID, bucket: String) {
+        self.accountID = accountID
+        self.bucket = bucket
+    }
+
+    init?(encoded: String) {
+        guard let separator = encoded.firstIndex(of: "|"),
+              let uuid = UUID(uuidString: String(encoded[..<separator]))
+        else { return nil }
+        let name = String(encoded[encoded.index(after: separator)...])
+        guard !name.isEmpty else { return nil }
+        self.accountID = uuid
+        self.bucket = name
+    }
+}
+
+/// Row shown in the hover drop panel.
+struct DropRowModel: Identifiable {
+    let target: MenuDropTarget
+    let accountName: String
+    var id: String { target.encoded }
+}
+
 // MARK: - Menu bar icon styles
 
 enum MenuBarIconStyle: String, CaseIterable, Identifiable {
@@ -95,12 +128,23 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     func dragEntered(near view: NSView?) {
         DropAnimationController.shared.cancelHoverClose()
-        let names = Set(AppState.shared.buckets.map(\.name))
-        var rows = Self.dropShortlist().filter { names.contains($0) }
-        if rows.isEmpty, let auto = AppState.shared.menuBarTargetBucket() {
-            rows = [auto]
+        let appState = AppState.shared
+        var rows: [DropRowModel] = Self.dropShortlist()
+            .compactMap { MenuDropTarget(encoded: $0) }
+            .filter { appState.isValidDropTarget($0) }
+            .compactMap { target in
+                guard let account = appState.accountStore.accounts
+                    .first(where: { $0.id == target.accountID }) else { return nil }
+                let name = account.name.isEmpty ? account.provider.displayName : account.name
+                return DropRowModel(target: target, accountName: name)
+            }
+        if rows.isEmpty, let auto = appState.menuBarAutoTarget() {
+            let name = appState.accountStore.accounts
+                .first { $0.id == auto.accountID }
+                .map { $0.name.isEmpty ? $0.provider.displayName : $0.name } ?? ""
+            rows = [DropRowModel(target: auto, accountName: name)]
         }
-        DropAnimationController.shared.showHover(buckets: rows, near: view)
+        DropAnimationController.shared.showHover(rows: rows, near: view)
     }
 
     /// The drag left the icon — maybe heading into the hover panel, so close
@@ -129,28 +173,42 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
         let targetItem = NSMenuItem(title: "Drop Menu Buckets", action: nil, keyEquivalent: "")
         let submenu = NSMenu()
-        let shortlist = Self.dropShortlist()
-        let buckets = AppState.shared.buckets
-        if buckets.isEmpty {
-            let none = NSMenuItem(title: "No buckets loaded", action: nil, keyEquivalent: "")
-            none.isEnabled = false
-            submenu.addItem(none)
-        } else {
-            let hint = NSMenuItem(
-                title: "Check buckets to show when dragging over the icon",
-                action: nil, keyEquivalent: ""
-            )
-            hint.isEnabled = false
-            submenu.addItem(hint)
+        let shortlist = Set(Self.dropShortlist())
+        let appState = AppState.shared
+        var addedAny = false
+
+        let hint = NSMenuItem(
+            title: "Check buckets to show when dragging over the icon",
+            action: nil, keyEquivalent: ""
+        )
+        hint.isEnabled = false
+        submenu.addItem(hint)
+
+        for account in appState.accountStore.accounts {
+            let buckets = appState.bucketList(for: account.id)
+            guard !buckets.isEmpty else { continue }
             submenu.addItem(.separator())
+            let displayName = account.name.isEmpty ? account.provider.displayName : account.name
+            let header = NSMenuItem(title: displayName.uppercased(), action: nil, keyEquivalent: "")
+            header.isEnabled = false
+            submenu.addItem(header)
             for bucket in buckets {
+                let target = MenuDropTarget(accountID: account.id, bucket: bucket.name)
                 let item = NSMenuItem(
                     title: bucket.name, action: #selector(toggleDropBucket(_:)), keyEquivalent: ""
                 )
                 item.target = self
-                item.state = shortlist.contains(bucket.name) ? .on : .off
+                item.representedObject = target.encoded
+                item.state = shortlist.contains(target.encoded) ? .on : .off
+                item.indentationLevel = 1
                 submenu.addItem(item)
+                addedAny = true
             }
+        }
+        if !addedAny {
+            let none = NSMenuItem(title: "No buckets loaded yet", action: nil, keyEquivalent: "")
+            none.isEnabled = false
+            submenu.addItem(none)
         }
         targetItem.submenu = submenu
         menu.addItem(targetItem)
@@ -179,20 +237,21 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     @objc private func toggleDropBucket(_ sender: NSMenuItem) {
+        guard let encoded = sender.representedObject as? String else { return }
         var shortlist = Self.dropShortlist()
-        if let index = shortlist.firstIndex(of: sender.title) {
+        if let index = shortlist.firstIndex(of: encoded) {
             shortlist.remove(at: index)
         } else {
-            shortlist.append(sender.title)
+            shortlist.append(encoded)
         }
         UserDefaults.standard.set(shortlist, forKey: Self.dropBucketsKey)
     }
 
-    /// Drop on the icon itself (`bucket == nil` → automatic target) or on a
+    /// Drop on the icon itself (`target == nil` → automatic target) or on a
     /// specific bucket row inside the hover panel.
-    func handleDrop(urls: [URL], bucket: String? = nil) {
+    func handleDrop(urls: [URL], target: MenuDropTarget? = nil) {
         DropAnimationController.shared.closeHover()
-        guard let resolved = AppState.shared.handleMenuBarDrop(urls: urls, to: bucket) else {
+        guard let resolved = AppState.shared.handleMenuBarDrop(urls: urls, to: target) else {
             return
         }
         DropAnimationController.shared.play(
@@ -268,14 +327,14 @@ final class DropAnimationController {
     private init() {}
 
     /// Shown while a drag hovers over the status icon, before the user lets go.
-    /// Each listed bucket is its own drop zone.
-    func showHover(buckets: [String], near view: NSView?) {
-        guard hoverPanel == nil, !buckets.isEmpty else { return }
+    /// Each listed bucket (possibly across accounts) is its own drop zone.
+    func showHover(rows: [DropRowModel], near view: NSView?) {
+        guard hoverPanel == nil, !rows.isEmpty else { return }
         let content = BucketDropListView(
-            buckets: buckets,
+            rows: rows,
             theme: ThemeStore.shared.theme,
-            onDrop: { bucket, urls in
-                MenuBarController.shared.handleDrop(urls: urls, bucket: bucket)
+            onDrop: { target, urls in
+                MenuBarController.shared.handleDrop(urls: urls, target: target)
             },
             onTargetedChange: { targeted in
                 if targeted {
@@ -285,10 +344,10 @@ final class DropAnimationController {
                 }
             }
         )
-        let height = CGFloat(66 + buckets.count * 46)
+        let height = CGFloat(66 + rows.count * 52)
         hoverPanel = presentPanel(
             rootView: AnyView(content),
-            size: NSSize(width: 248, height: height),
+            size: NSSize(width: 252, height: height),
             near: view
         )
     }
@@ -381,18 +440,18 @@ final class DropAnimationController {
 /// Hover state: a list of bucket drop zones. Drop on the icon itself for the
 /// automatic target, or move down and drop on a specific bucket.
 struct BucketDropListView: View {
-    let buckets: [String]
+    let rows: [DropRowModel]
     let theme: AppTheme
-    let onDrop: (String, [URL]) -> Void
+    let onDrop: (MenuDropTarget, [URL]) -> Void
     let onTargetedChange: (Bool) -> Void
 
     var body: some View {
         VStack(spacing: 6) {
-            Text(buckets.count == 1 ? "Release to upload" : "Drop on a bucket")
+            Text(rows.count == 1 ? "Release to upload" : "Drop on a bucket")
                 .font(.callout.weight(.semibold))
-            ForEach(buckets, id: \.self) { bucket in
+            ForEach(rows) { row in
                 BucketDropRow(
-                    bucket: bucket,
+                    row: row,
                     theme: theme,
                     onDrop: onDrop,
                     onTargetedChange: onTargetedChange
@@ -400,7 +459,7 @@ struct BucketDropListView: View {
             }
         }
         .padding(12)
-        .frame(width: 236)
+        .frame(width: 240)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -411,9 +470,9 @@ struct BucketDropListView: View {
 }
 
 struct BucketDropRow: View {
-    let bucket: String
+    let row: DropRowModel
     let theme: AppTheme
-    let onDrop: (String, [URL]) -> Void
+    let onDrop: (MenuDropTarget, [URL]) -> Void
     let onTargetedChange: (Bool) -> Void
 
     @State private var targeted = false
@@ -422,10 +481,16 @@ struct BucketDropRow: View {
         HStack(spacing: 8) {
             Image(systemName: "tray.full.fill")
                 .foregroundStyle(targeted ? AnyShapeStyle(theme.gradient) : AnyShapeStyle(.secondary))
-            Text(bucket)
-                .font(.callout.weight(.medium))
-                .lineLimit(1)
-                .truncationMode(.middle)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(row.target.bucket)
+                    .font(.callout.weight(.medium))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Text(row.accountName)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
             Spacer()
             Image(systemName: "arrow.down.circle\(targeted ? ".fill" : "")")
                 .foregroundStyle(targeted ? theme.primary : Color.secondary)
@@ -455,9 +520,10 @@ struct BucketDropRow: View {
                 }
             )
         ) { providers in
+            let target = row.target
             FileDrop.loadFileURLs(from: providers) { urls in
                 guard !urls.isEmpty else { return }
-                onDrop(bucket, urls)
+                onDrop(target, urls)
             }
             return true
         }
