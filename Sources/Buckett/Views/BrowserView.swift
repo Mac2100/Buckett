@@ -8,6 +8,7 @@ struct BrowserView: View {
     @State private var metadataObject: RemoteObject?
     @State private var renameObject: RemoteObject?
     @State private var showBatchRename = false
+    @State private var showMove = false
     @State private var deleteTargets: [RemoteObject] = []
     @State private var showDeleteConfirm = false
     @State private var showNewFolder = false
@@ -22,25 +23,33 @@ struct BrowserView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            breadcrumbBar
-            Divider()
-            content
-            Divider()
+            controlsBar
+            Divider().opacity(0.4)
+            ZStack(alignment: .bottom) {
+                content
+                if !model.selection.isEmpty {
+                    selectionBar
+                        .padding(.bottom, 14)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .animation(.snappy(duration: 0.2), value: model.selection.isEmpty)
+            Divider().opacity(0.4)
             statusBar
         }
-        .searchable(text: $model.filterText, placement: .toolbar, prompt: "Filter by name")
-        .toolbar { toolbarContent }
         .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
             FileDrop.loadFileURLs(from: providers) { urls in
                 guard !urls.isEmpty else { return }
                 model.upload(urls: urls)
+                ToastCenter.shared.show(
+                    "Uploading \(urls.count) item\(urls.count == 1 ? "" : "s")",
+                    style: .info
+                )
             }
             return true
         }
         .overlay {
-            if isDropTargeted {
-                dropOverlay
-            }
+            if isDropTargeted { dropOverlay }
         }
         .task { await model.load() }
         .sheet(item: $previewObject) { object in
@@ -54,6 +63,9 @@ struct BrowserView: View {
         }
         .sheet(isPresented: $showBatchRename) {
             BatchRenameSheet(model: model)
+        }
+        .sheet(isPresented: $showMove) {
+            MoveSheet(model: model)
         }
         .sheet(isPresented: $showNewFolder) { newFolderSheet }
         .confirmationDialog(
@@ -78,7 +90,6 @@ struct BrowserView: View {
         } message: {
             Text(model.errorMessage ?? "")
         }
-        .navigationTitle(model.bucket)
     }
 
     private var deleteMessage: String {
@@ -87,14 +98,136 @@ struct BrowserView: View {
             : "Delete \(deleteTargets.count) items? This cannot be undone."
     }
 
+    // MARK: - Controls bar
+
+    private var controlsBar: some View {
+        HStack(spacing: 10) {
+            breadcrumb
+            Spacer(minLength: 12)
+            SearchField(text: $model.filterText, prompt: "Filter by name")
+
+            Button {
+                let urls = Panels.chooseFilesForUpload()
+                guard !urls.isEmpty else { return }
+                model.upload(urls: urls)
+            } label: {
+                Label("Upload", systemImage: "square.and.arrow.up")
+                    .font(.system(size: 12, weight: .medium))
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(Brand.indigo)
+            .help("Upload files or folders")
+
+            CapsuleSegments(
+                options: [
+                    (ViewMode.grid, "Grid", "square.grid.2x2"),
+                    (ViewMode.list, "List", "list.bullet")
+                ],
+                selection: $model.viewMode,
+                showLabels: false
+            )
+
+            sortMenu
+
+            Button {
+                Task { await model.refresh() }
+            } label: {
+                Image(systemName: "arrow.clockwise")
+            }
+            .help("Refresh")
+
+            Button(allSelected ? "Unselect all" : "Select all") {
+                if allSelected {
+                    model.selection.removeAll()
+                } else {
+                    model.selection = Set(model.displayItems.map(\.id))
+                }
+            }
+            .disabled(model.displayItems.isEmpty)
+
+            Menu {
+                Button("New Folder…") {
+                    newFolderName = ""
+                    showNewFolder = true
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+            }
+            .menuStyle(.borderlessButton)
+            .frame(width: 28)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+    }
+
+    private var allSelected: Bool {
+        !model.displayItems.isEmpty && model.selection.count == model.displayItems.count
+    }
+
+    private var sortMenu: some View {
+        Menu {
+            Picker("Sort by", selection: $model.sortField) {
+                ForEach(SortField.allCases) { field in
+                    Text(field.label).tag(field)
+                }
+            }
+            Divider()
+            Picker("Order", selection: $model.sortAscending) {
+                Text("Ascending").tag(true)
+                Text("Descending").tag(false)
+            }
+        } label: {
+            Image(systemName: "arrow.up.arrow.down")
+        }
+        .menuStyle(.borderlessButton)
+        .frame(width: 28)
+        .help("Sort")
+    }
+
+    private var breadcrumb: some View {
+        HStack(spacing: 4) {
+            Button {
+                model.navigateUp()
+            } label: {
+                Image(systemName: "chevron.up")
+            }
+            .buttonStyle(.borderless)
+            .disabled(model.prefix.isEmpty)
+            .help("Up one level")
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 3) {
+                    ForEach(Array(model.breadcrumbs.enumerated()), id: \.offset) { index, crumb in
+                        if index > 0 {
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.tertiary)
+                        }
+                        Button {
+                            model.navigate(toPrefix: crumb.prefix)
+                        } label: {
+                            Text(index == 0 ? "All Files" : crumb.name)
+                                .font(.system(size: 13, weight: index == model.breadcrumbs.count - 1 ? .semibold : .regular))
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                }
+            }
+            .frame(maxWidth: 320, alignment: .leading)
+        }
+    }
+
     // MARK: - Content
 
     @ViewBuilder
     private var content: some View {
         if model.isLoading && model.displayItems.isEmpty {
-            Spacer()
-            ProgressView("Loading…")
-            Spacer()
+            VStack {
+                Spacer()
+                ProgressView("Loading…")
+                Spacer()
+            }
+            .frame(maxWidth: .infinity)
         } else if model.displayItems.isEmpty {
             emptyState
         } else {
@@ -116,80 +249,133 @@ struct BrowserView: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: 10) {
+        VStack {
             Spacer()
-            Image(systemName: "tray")
-                .font(.system(size: 42))
-                .foregroundStyle(.tertiary)
-            Text(model.filterText.isEmpty ? "This folder is empty" : "No matches")
+            VStack(spacing: 12) {
+                Image(systemName: model.filterText.isEmpty ? "folder" : "magnifyingglass")
+                    .font(.system(size: 38))
+                    .foregroundStyle(Brand.gradient)
+                Text(model.filterText.isEmpty ? "This folder has no files yet" : "No matches")
+                    .font(.title3.weight(.semibold))
+                Text(
+                    model.filterText.isEmpty
+                        ? "Create a folder, drop files here, or use the button below\nto start building your object storage."
+                        : "Nothing here matches “\(model.filterText)”."
+                )
+                .font(.callout)
                 .foregroundStyle(.secondary)
-            if model.filterText.isEmpty {
-                Text("Drop files here to upload")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+                if model.filterText.isEmpty {
+                    Button {
+                        let urls = Panels.chooseFilesForUpload()
+                        guard !urls.isEmpty else { return }
+                        model.upload(urls: urls)
+                    } label: {
+                        Label("Upload Files", systemImage: "square.and.arrow.up")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Brand.indigo)
+                    .controlSize(.large)
+                    .padding(.top, 4)
+                }
             }
+            .frame(maxWidth: 380)
+            .glassCard(cornerRadius: 16, padding: 34)
             Spacer()
         }
         .frame(maxWidth: .infinity)
     }
 
     private var dropOverlay: some View {
-        RoundedRectangle(cornerRadius: 10)
-            .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 3, dash: [8]))
-            .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .strokeBorder(Brand.indigo, style: StrokeStyle(lineWidth: 3, dash: [8]))
+            .background(
+                Brand.indigo.opacity(0.07),
+                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            )
             .overlay {
-                Label("Drop to upload to \(model.bucket)/\(model.prefix)", systemImage: "arrow.up.doc")
-                    .font(.title3.weight(.medium))
-                    .padding(12)
-                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 8))
+                Label(
+                    "Drop to upload to \(model.bucket)/\(model.prefix)",
+                    systemImage: "arrow.up.doc"
+                )
+                .font(.title3.weight(.medium))
+                .padding(12)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
             }
             .padding(8)
             .allowsHitTesting(false)
     }
 
-    // MARK: - Breadcrumbs
+    // MARK: - Selection action bar
 
-    private var breadcrumbBar: some View {
+    private var selectionBar: some View {
         HStack(spacing: 4) {
-            Button {
-                model.navigateUp()
-            } label: {
-                Image(systemName: "chevron.up")
-            }
-            .buttonStyle(.borderless)
-            .disabled(model.prefix.isEmpty)
-            .help("Up one level")
+            Text("\(model.selection.count) selected")
+                .font(.callout.weight(.semibold))
+                .padding(.trailing, 6)
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 2) {
-                    ForEach(Array(model.breadcrumbs.enumerated()), id: \.offset) { index, crumb in
-                        if index > 0 {
-                            Image(systemName: "chevron.right")
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-                        }
-                        Button {
-                            model.navigate(toPrefix: crumb.prefix)
-                        } label: {
-                            HStack(spacing: 3) {
-                                if index == 0 {
-                                    Image(systemName: "tray.full")
-                                }
-                                Text(crumb.name)
-                            }
-                        }
-                        .buttonStyle(.borderless)
-                        .fontWeight(index == model.breadcrumbs.count - 1 ? .semibold : .regular)
+            barButton("Download", symbol: "square.and.arrow.down") {
+                handleAction(.download, model.selectedObjects)
+            }
+            barButton("Move…", symbol: "folder") {
+                showMove = true
+            }
+            .disabled(model.selectedObjects.allSatisfy(\.isFolder))
+            if model.selectedObjects.count == 1 {
+                barButton("Rename…", symbol: "pencil") {
+                    renameObject = model.selectedObjects.first
+                }
+                if let single = model.selectedObjects.first, !single.isFolder {
+                    barButton("Copy Link", symbol: "link") {
+                        model.copyPresignedLink(for: single)
                     }
                 }
+            } else {
+                barButton("Batch Rename…", symbol: "pencil") {
+                    showBatchRename = true
+                }
+                .disabled(model.selectedObjects.allSatisfy(\.isFolder))
             }
-            Spacer()
-            if model.isBusy || model.isLoading {
-                ProgressView().controlSize(.small)
+            barButton("Copy Keys", symbol: "doc.on.doc") {
+                copyKeys(model.selectedObjects)
             }
+            barButton("Delete", symbol: "trash", role: .destructive) {
+                requestDelete(model.selectedObjects)
+            }
+
+            Divider().frame(height: 16).padding(.horizontal, 3)
+
+            Button {
+                model.selection.removeAll()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Clear selection")
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 9)
+        .background(.regularMaterial, in: Capsule())
+        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.1), lineWidth: 1))
+        .shadow(color: .black.opacity(0.14), radius: 12, y: 4)
+    }
+
+    private func barButton(
+        _ title: String,
+        symbol: String,
+        role: ButtonRole? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(role: role, action: action) {
+            Label(title, systemImage: symbol)
+                .font(.system(size: 12, weight: .medium))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(role == .destructive ? Color.red : Color.primary)
     }
 
     // MARK: - Status bar
@@ -198,112 +384,32 @@ struct BrowserView: View {
         HStack(spacing: 12) {
             Text("\(model.folders.count) folders, \(model.files.count) files")
                 .foregroundStyle(.secondary)
-            if !model.selection.isEmpty {
-                Text("\(model.selection.count) selected")
-                    .foregroundStyle(.secondary)
-                let selectedSize = model.selectedObjects
-                    .filter { !$0.isFolder }
-                    .reduce(Int64(0)) { $0 + $1.size }
-                if selectedSize > 0 {
-                    Text(selectedSize.formattedBytes)
-                        .foregroundStyle(.secondary)
-                }
-            }
             if model.isTruncated {
                 Button("Load more…") {
                     Task { await model.loadMore() }
                 }
                 .buttonStyle(.link)
             }
+            if model.isBusy {
+                ProgressView().controlSize(.mini)
+            }
             Spacer()
             TransfersStatusLabel(transfers: model.transfers)
-        }
-        .font(.caption)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 5)
-    }
-
-    // MARK: - Toolbar
-
-    @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
-        ToolbarItemGroup {
-            Picker("View", selection: $model.viewMode) {
-                ForEach(ViewMode.allCases) { mode in
-                    Image(systemName: mode.symbolName)
-                        .help(mode.label)
-                        .tag(mode)
-                }
+            if let synced = model.lastSynced {
+                Text("Last sync \(synced.formatted(date: .omitted, time: .standard))")
+                    .foregroundStyle(.tertiary)
             }
-            .pickerStyle(.segmented)
-
-            Menu {
-                Picker("Sort by", selection: $model.sortField) {
-                    ForEach(SortField.allCases) { field in
-                        Text(field.label).tag(field)
-                    }
-                }
-                Divider()
-                Picker("Order", selection: $model.sortAscending) {
-                    Text("Ascending").tag(true)
-                    Text("Descending").tag(false)
-                }
-            } label: {
-                Label("Sort", systemImage: "arrow.up.arrow.down")
-            }
-            .help("Sort")
-
-            Button {
-                let urls = Panels.chooseFilesForUpload()
-                guard !urls.isEmpty else { return }
-                model.upload(urls: urls)
-            } label: {
-                Label("Upload", systemImage: "square.and.arrow.up")
-            }
-            .help("Upload files or folders")
-
-            Button {
-                downloadSelection()
-            } label: {
-                Label("Download", systemImage: "square.and.arrow.down")
-            }
-            .help("Download selection")
-            .disabled(model.selection.isEmpty)
-
-            Button {
-                requestDelete(model.selectedObjects)
-            } label: {
-                Label("Delete", systemImage: "trash")
-            }
-            .help("Delete selection")
-            .disabled(model.selection.isEmpty)
-
-            Menu {
-                Button("New Folder…") {
-                    newFolderName = ""
-                    showNewFolder = true
-                }
-                Button("Batch Rename…") {
-                    showBatchRename = true
-                }
-                .disabled(model.selectedObjects.filter { !$0.isFolder }.isEmpty)
-                Button("Copy Keys") {
-                    copyKeys(model.selectedObjects)
-                }
-                .disabled(model.selection.isEmpty)
-            } label: {
-                Label("More", systemImage: "ellipsis.circle")
-            }
-
-            TransfersToolbarButton(transfers: model.transfers)
-
             Button {
                 Task { await model.refresh() }
             } label: {
-                Label("Refresh", systemImage: "arrow.clockwise")
+                Label("Sync", systemImage: "arrow.triangle.2.circlepath")
+                    .font(.caption)
             }
-            .help("Refresh")
+            .buttonStyle(.borderless)
         }
+        .font(.caption)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
     }
 
     // MARK: - Actions
@@ -325,23 +431,28 @@ struct BrowserView: View {
         case .download:
             guard let directory = Panels.chooseDownloadDirectory() else { return }
             model.download(objects: objects, to: directory)
+            ToastCenter.shared.show(
+                "Downloading \(objects.count) item\(objects.count == 1 ? "" : "s")",
+                style: .info
+            )
         case .rename:
             renameObject = objects.first
         case .delete:
             requestDelete(objects)
         case .copyKey:
             copyKeys(objects)
+        case .copyLink:
+            if let first = objects.first, !first.isFolder {
+                model.copyPresignedLink(for: first)
+            }
+        case .move:
+            model.selection = Set(objects.map(\.id))
+            showMove = true
         case .metadata:
             if let first = objects.first, !first.isFolder {
                 metadataObject = first
             }
         }
-    }
-
-    private func downloadSelection() {
-        let objects = model.selectedObjects
-        guard !objects.isEmpty, let directory = Panels.chooseDownloadDirectory() else { return }
-        model.download(objects: objects, to: directory)
     }
 
     private func requestDelete(_ objects: [RemoteObject]) {
@@ -354,38 +465,43 @@ struct BrowserView: View {
         let keys = objects.map(\.key).joined(separator: "\n")
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(keys, forType: .string)
+        ToastCenter.shared.show("Copied \(objects.count) key\(objects.count == 1 ? "" : "s")")
     }
 
     private var newFolderSheet: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("New Folder").font(.headline)
+        VStack(spacing: 14) {
+            Image(systemName: "folder.badge.plus")
+                .font(.system(size: 28))
+                .foregroundStyle(Brand.gradient)
+            Text("New Folder").font(.title3.weight(.semibold))
             TextField("Folder name", text: $newFolderName)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 260)
             HStack {
-                Spacer()
                 Button("Cancel") { showNewFolder = false }
                     .keyboardShortcut(.cancelAction)
+                Spacer()
                 Button("Create") {
                     let name = newFolderName
                     showNewFolder = false
                     Task { await model.createFolder(named: name) }
                 }
+                .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)
                 .disabled(newFolderName.trimmingCharacters(in: .whitespaces).isEmpty)
             }
+            .frame(width: 260)
         }
-        .padding(20)
+        .padding(22)
     }
 }
 
 // MARK: - Shared bits
 
 enum ObjectAction {
-    case preview, download, rename, delete, copyKey, metadata
+    case preview, download, rename, delete, copyKey, copyLink, move, metadata
 }
 
-/// Small label in the status bar summarizing transfer activity.
 struct TransfersStatusLabel: View {
     @ObservedObject var transfers: TransferManager
 
@@ -396,34 +512,6 @@ struct TransfersStatusLabel: View {
                 Text("\(transfers.activeCount) transfer\(transfers.activeCount == 1 ? "" : "s") active")
                     .foregroundStyle(.secondary)
             }
-        }
-    }
-}
-
-struct TransfersToolbarButton: View {
-    @ObservedObject var transfers: TransferManager
-    @State private var showPopover = false
-
-    var body: some View {
-        Button {
-            showPopover.toggle()
-        } label: {
-            Label("Transfers", systemImage: "arrow.up.arrow.down.circle")
-        }
-        .help("Show transfers")
-        .overlay(alignment: .topTrailing) {
-            if transfers.activeCount > 0 {
-                Text("\(transfers.activeCount)")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 1)
-                    .background(Capsule().fill(Color.accentColor))
-                    .offset(x: 6, y: -4)
-            }
-        }
-        .popover(isPresented: $showPopover, arrowEdge: .bottom) {
-            TransfersView(transfers: transfers)
         }
     }
 }

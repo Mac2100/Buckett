@@ -19,6 +19,7 @@ final class AppState: ObservableObject {
         }
     }
     @Published var sidebarSelection: SidebarSelection? = .dashboard
+    @Published var showOnboarding = false
     @Published var buckets: [Bucket] = []
     @Published var bucketsLoading = false
     @Published var bucketsError: String?

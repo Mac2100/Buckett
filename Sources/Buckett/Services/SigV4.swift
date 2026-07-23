@@ -44,6 +44,74 @@ enum SigV4 {
         return f
     }()
 
+    /// Builds a presigned GET/PUT URL (SigV4 query-string auth) valid for `expires` seconds.
+    /// The URL's percent-encoded path must already be in canonical form.
+    static func presign(
+        url: URL,
+        method: String = "GET",
+        credentials: Credentials,
+        region: String,
+        service: String = "s3",
+        expires: Int,
+        date: Date = Date()
+    ) -> URL? {
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let host = components.host
+        else { return nil }
+
+        let amzDate = amzDateFormatter.string(from: date)
+        let dateStamp = String(amzDate.prefix(8))
+        let scope = "\(dateStamp)/\(region)/\(service)/aws4_request"
+
+        var hostHeader = host
+        if let port = components.port, port != 443, port != 80 {
+            hostHeader += ":\(port)"
+        }
+
+        var query: [(String, String)] = [
+            ("X-Amz-Algorithm", "AWS4-HMAC-SHA256"),
+            ("X-Amz-Credential", "\(credentials.accessKeyID)/\(scope)"),
+            ("X-Amz-Date", amzDate),
+            ("X-Amz-Expires", String(expires)),
+            ("X-Amz-SignedHeaders", "host")
+        ]
+        let canonicalQuery = query
+            .map { (encode($0.0), encode($0.1)) }
+            .sorted { $0.0 < $1.0 }
+            .map { "\($0.0)=\($0.1)" }
+            .joined(separator: "&")
+
+        let canonicalURI = components.percentEncodedPath.isEmpty ? "/" : components.percentEncodedPath
+        let canonicalRequest = [
+            method,
+            canonicalURI,
+            canonicalQuery,
+            "host:\(hostHeader)\n",
+            "host",
+            "UNSIGNED-PAYLOAD"
+        ].joined(separator: "\n")
+
+        let stringToSign = [
+            "AWS4-HMAC-SHA256",
+            amzDate,
+            scope,
+            sha256Hex(Data(canonicalRequest.utf8))
+        ].joined(separator: "\n")
+
+        let kDate = hmac(key: Data(("AWS4" + credentials.secretAccessKey).utf8), string: dateStamp)
+        let kRegion = hmac(key: kDate, string: region)
+        let kService = hmac(key: kRegion, string: service)
+        let kSigning = hmac(key: kService, string: "aws4_request")
+        let signature = hmac(key: kSigning, string: stringToSign)
+            .map { String(format: "%02x", $0) }.joined()
+
+        query.append(("X-Amz-Signature", signature))
+        components.percentEncodedQuery = query
+            .map { "\(encode($0.0))=\(encode($0.1))" }
+            .joined(separator: "&")
+        return components.url
+    }
+
     /// Signs `request` in place. The request URL's percent-encoded path and query must
     /// already be in canonical (SigV4) form — `S3Client` builds them that way.
     static func sign(

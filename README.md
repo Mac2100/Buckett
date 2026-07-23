@@ -8,14 +8,18 @@ Buckett is a free, open alternative to paid closed-source R2 clients: your crede
 
 ## Features
 
-- **Visual bucket explorer** — browse buckets and folders with breadcrumb navigation, in a grid view (with image thumbnails) or a list view with columns.
+- **Visual bucket explorer** — browse buckets and folders with breadcrumb navigation, in a grid view (with image thumbnails, hover previews, and selection badges) or a list view with columns.
+- **Guided onboarding** — a step-by-step wizard (provider → connection → credentials → test) gets a new account working in under a minute.
 - **Drag & drop uploads** — drop files or entire folders anywhere in the browser; folder structure is preserved.
-- **Batch operations** — multi-select to upload, download, delete, or batch-rename (find & replace) many objects at once. Folder download/delete/rename recurse automatically.
+- **Batch operations** — multi-select to upload, download, delete, move, or batch-rename (find & replace) many objects at once via a floating action bar. Folder download/delete/rename recurse automatically.
+- **Move files** — server-side move (copy + delete) into any folder or typed path, with Skip / Replace / Rename conflict handling.
+- **Share links** — copy a time-limited presigned URL for any object (works without enabling public bucket access).
 - **Resumable uploads** — files ≥ 16 MB use S3 multipart uploads; progress is checkpointed after every part, so an interrupted or failed upload resumes from the last completed part when retried (even after relaunching the app).
 - **Previews** — Quick Look previews for common file types (images, video, audio, PDF, text, code, and more).
 - **File metadata** — inspect content type, size, ETag, storage class, and custom `x-amz-meta-*` metadata.
 - **Sorting & filtering** — sort by name, size, date, or kind; filter the current folder by name.
-- **Dashboard** — per-bucket usage analytics: total size, object count, largest objects, and a size-by-file-type chart.
+- **Statistics** — per-bucket usage cards (storage, objects, estimated monthly cost), a local upload-activity heatmap, largest objects, and a size-by-file-type chart — plus an account-wide overview dashboard.
+- **Transfers view** — filterable queue (queued / active / completed / failed) with live speed, multipart part progress, retry/resume, and share-link or reveal-in-Finder actions.
 - **Multiple accounts** — manage any number of R2 and B2 accounts and switch between them from the sidebar.
 - **Local-only encrypted credential storage** — secret keys are stored exclusively in the macOS Keychain (encrypted at rest by the OS). No telemetry, no third-party servers, no license checks.
 - **Update checks** — optional check against GitHub Releases at launch, plus "Check for Updates…" in the app menu.

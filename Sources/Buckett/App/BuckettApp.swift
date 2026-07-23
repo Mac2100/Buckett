@@ -8,7 +8,7 @@ struct BuckettApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(appState)
-                .frame(minWidth: 940, minHeight: 560)
+                .frame(minWidth: 1000, minHeight: 620)
                 .task {
                     appState.updates.checkOnLaunchIfEnabled()
                     await appState.loadBuckets()

@@ -26,6 +26,7 @@ final class BrowserModel: ObservableObject {
     @Published var sortAscending = true
     @Published var selection = Set<String>()
     @Published var isTruncated = false
+    @Published var lastSynced: Date?
 
     private var continuationToken: String?
     private var observer: NSObjectProtocol?
@@ -114,6 +115,7 @@ final class BrowserModel: ObservableObject {
             files = result.objects
             isTruncated = result.isTruncated
             continuationToken = result.nextContinuationToken
+            lastSynced = Date()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -266,12 +268,101 @@ final class BrowserModel: ObservableObject {
                     keys.append(object.key)
                 }
             }
-            try await client.deleteObjects(bucket: bucket, keys: Array(Set(keys)))
+            let uniqueKeys = Array(Set(keys))
+            try await client.deleteObjects(bucket: bucket, keys: uniqueKeys)
             selection.removeAll()
             await load()
+            ToastCenter.shared.show(
+                "Deleted \(uniqueKeys.count) item\(uniqueKeys.count == 1 ? "" : "s")"
+            )
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    // MARK: - Move (copy + delete into another prefix)
+
+    enum ConflictStrategy: String, CaseIterable, Identifiable {
+        case skip, replace, rename
+        var id: String { rawValue }
+
+        var label: String {
+            switch self {
+            case .skip: return "Skip"
+            case .replace: return "Replace"
+            case .rename: return "Rename"
+            }
+        }
+
+        var detail: String {
+            switch self {
+            case .skip: return "Keep the original; don't move conflicting files"
+            case .replace: return "Overwrite files with the same name at the target"
+            case .rename: return "Auto-add a suffix (-1, -2, …) on conflict"
+            }
+        }
+    }
+
+    /// Moves the selected files (folders are skipped) into `targetPrefix`.
+    func move(objects: [RemoteObject], toPrefix targetPrefix: String, strategy: ConflictStrategy) async {
+        isBusy = true
+        defer { isBusy = false }
+        var moved = 0
+        var skipped = 0
+        do {
+            for object in objects where !object.isFolder {
+                var destKey = targetPrefix + object.name
+                if destKey == object.key { skipped += 1; continue }
+
+                if try await client.objectExists(bucket: bucket, key: destKey) {
+                    switch strategy {
+                    case .skip:
+                        skipped += 1
+                        continue
+                    case .replace:
+                        break
+                    case .rename:
+                        let base = (object.name as NSString).deletingPathExtension
+                        let ext = (object.name as NSString).pathExtension
+                        var attempt = 1
+                        repeat {
+                            let candidate = ext.isEmpty
+                                ? "\(base)-\(attempt)"
+                                : "\(base)-\(attempt).\(ext)"
+                            destKey = targetPrefix + candidate
+                            attempt += 1
+                        } while try await client.objectExists(bucket: bucket, key: destKey)
+                    }
+                }
+
+                try await client.copyObject(bucket: bucket, fromKey: object.key, toKey: destKey)
+                try await client.deleteObject(bucket: bucket, key: object.key)
+                moved += 1
+            }
+            selection.removeAll()
+            await load()
+            var detail: String? = nil
+            if skipped > 0 { detail = "\(skipped) skipped" }
+            ToastCenter.shared.show("Moved \(moved) file\(moved == 1 ? "" : "s")", detail: detail)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Folder prefixes at an arbitrary prefix — used by the Move dialog's folder browser.
+    func listFolders(at browsePrefix: String) async -> [RemoteObject] {
+        (try? await client.listObjects(bucket: bucket, prefix: browsePrefix))?.folders ?? []
+    }
+
+    /// Copies a time-limited presigned link for the object to the pasteboard.
+    func copyPresignedLink(for object: RemoteObject, expires: TimeInterval = 7 * 24 * 3600) {
+        guard let url = client.presignedURL(bucket: bucket, key: object.key, expires: expires) else {
+            errorMessage = "Could not create a presigned link."
+            return
+        }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(url.absoluteString, forType: .string)
+        ToastCenter.shared.show("Share link copied", detail: "Valid for 7 days")
     }
 
     // MARK: - Rename (copy + delete)
@@ -298,6 +389,7 @@ final class BrowserModel: ObservableObject {
                 try await client.deleteObject(bucket: bucket, key: object.key)
             }
             await load()
+            ToastCenter.shared.show("Renamed to \(trimmed)")
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -332,6 +424,7 @@ final class BrowserModel: ObservableObject {
         do {
             try await client.putObject(bucket: bucket, key: prefix + trimmed + "/", data: Data())
             await load()
+            ToastCenter.shared.show("Folder created", detail: trimmed)
         } catch {
             errorMessage = error.localizedDescription
         }
