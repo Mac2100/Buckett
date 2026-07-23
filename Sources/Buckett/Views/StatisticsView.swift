@@ -49,6 +49,11 @@ struct StatisticsView: View {
             }
             .padding(18)
         }
+        .task {
+            if stats == nil {
+                appState.analyze(bucket: bucket)
+            }
+        }
     }
 
     // MARK: - Overview cards
@@ -95,20 +100,23 @@ struct StatisticsView: View {
 
     private var analyzePrompt: some View {
         VStack(spacing: 8) {
-            Text("No usage data yet")
-                .font(.callout.weight(.semibold))
-            Button {
-                appState.analyze(bucket: bucket)
-            } label: {
-                if analyzing {
+            if analyzing {
+                HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
-                } else {
+                    Text("Analyzing bucket…")
+                        .font(.callout.weight(.semibold))
+                }
+            } else {
+                Text("No usage data yet")
+                    .font(.callout.weight(.semibold))
+                Button {
+                    appState.analyze(bucket: bucket)
+                } label: {
                     Label("Analyze Bucket", systemImage: "chart.bar.doc.horizontal")
                 }
+                .buttonStyle(.borderedProminent)
+                .tint(theme.primary)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(theme.primary)
-            .disabled(analyzing)
         }
         .padding(14)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -143,11 +151,15 @@ struct StatisticsView: View {
 
     private func costString(bytes: Int64) -> String {
         let gb = Double(bytes) / 1_073_741_824
-        let freeGB = 10.0
+        let freeGB: Double
         let ratePerGB: Double
         switch appState.selectedAccount?.provider {
-        case .backblazeB2: ratePerGB = 0.006
-        default: ratePerGB = 0.015 // Cloudflare R2
+        case .backblazeB2:
+            freeGB = 10; ratePerGB = 0.006
+        case .amazonS3:
+            freeGB = 0; ratePerGB = 0.023   // S3 Standard, first tier
+        default:
+            freeGB = 10; ratePerGB = 0.015  // Cloudflare R2
         }
         let cost = max(0, gb - freeGB) * ratePerGB
         return String(format: "$%.2f", cost)

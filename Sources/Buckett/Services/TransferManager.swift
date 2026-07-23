@@ -219,6 +219,11 @@ final class TransferManager: ObservableObject {
                     task.state = .cancelled
                 } catch {
                     task.state = .failed(error.localizedDescription)
+                    Notifier.shared.post(
+                        .transferFailed,
+                        title: "Transfer failed",
+                        body: "\(task.displayName): \(error.localizedDescription)"
+                    )
                 }
                 task.bytesPerSecond = 0
                 task.partProgress = nil
@@ -227,6 +232,12 @@ final class TransferManager: ObservableObject {
                 if let self, self.activeCount == 0,
                    self.tasks.contains(where: { $0.state == .completed }) {
                     ToastCenter.shared.show("All transfers finished")
+                    let completed = self.tasks.filter { $0.state == .completed }.count
+                    Notifier.shared.post(
+                        .transfersComplete,
+                        title: "Transfers finished",
+                        body: "\(completed) transfer\(completed == 1 ? "" : "s") completed."
+                    )
                 }
             }
         }

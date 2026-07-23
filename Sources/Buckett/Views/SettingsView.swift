@@ -1,3 +1,4 @@
+import ServiceManagement
 import SwiftUI
 
 struct SettingsView: View {
@@ -9,6 +10,8 @@ struct SettingsView: View {
                 .tabItem { Label("Appearance", systemImage: "paintpalette") }
             GeneralSettingsView()
                 .tabItem { Label("General", systemImage: "gearshape") }
+            NotificationsSettingsView()
+                .tabItem { Label("Notifications", systemImage: "bell.badge") }
             UpdatesSettingsView()
                 .tabItem { Label("Updates", systemImage: "arrow.down.circle") }
             AboutSettingsView()
@@ -191,6 +194,9 @@ struct AccountEditorView: View {
                 case .backblazeB2:
                     TextField("Region (e.g. us-west-004)", text: $b2Region)
                         .help("The region from your bucket's S3 endpoint: s3.<region>.backblazeb2.com")
+                case .amazonS3:
+                    TextField("Region (e.g. us-east-1)", text: $b2Region)
+                        .help("The AWS region your buckets live in")
                 }
                 TextField("Custom Endpoint (optional)", text: $customEndpoint)
                     .help("Overrides the derived endpoint. Any S3-compatible endpoint works.")
@@ -414,6 +420,7 @@ struct GeneralSettingsView: View {
     @AppStorage("defaultViewMode") private var defaultViewMode = ViewMode.grid.rawValue
     @AppStorage("maxConcurrentTransfers") private var maxConcurrentTransfers = 3
     @AppStorage("showMenuBarIcon") private var showMenuBarIcon = true
+    @AppStorage("openAtLogin") private var openAtLogin = false
 
     var body: some View {
         Form {
@@ -434,9 +441,57 @@ struct GeneralSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            Section {
+                Toggle("Open at login", isOn: $openAtLogin)
+                    .onChange(of: openAtLogin) { _, enabled in
+                        do {
+                            if enabled {
+                                try SMAppService.mainApp.register()
+                            } else {
+                                try SMAppService.mainApp.unregister()
+                            }
+                        } catch {
+                            ToastCenter.shared.show(
+                                "Couldn't update login item",
+                                detail: error.localizedDescription,
+                                style: .error
+                            )
+                        }
+                    }
+            }
             Text("Uploads of 16 MB or more automatically use resumable multipart uploads. Interrupted uploads resume from the last completed part when retried.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+        }
+        .formStyle(.grouped)
+    }
+}
+
+// MARK: - Notifications
+
+struct NotificationsSettingsView: View {
+    @AppStorage("notifyTransfersComplete") private var transfersComplete = true
+    @AppStorage("notifyTransferFailed") private var transferFailed = true
+    @AppStorage("notifyDropStarted") private var dropStarted = false
+    @AppStorage("showToasts") private var showToasts = true
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle("All transfers finished", isOn: $transfersComplete)
+                Toggle("A transfer fails", isOn: $transferFailed)
+                Toggle("Menu bar drop starts uploading", isOn: $dropStarted)
+            } header: {
+                Text("System Notifications")
+            } footer: {
+                Text("Delivered through macOS Notification Center — allow notifications for Buckett when macOS asks the first time.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("In-App") {
+                Toggle("Show toast banners", isOn: $showToasts)
+            }
         }
         .formStyle(.grouped)
     }
