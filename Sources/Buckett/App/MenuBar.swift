@@ -2,6 +2,34 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
+// MARK: - Menu bar icon styles
+
+enum MenuBarIconStyle: String, CaseIterable, Identifiable {
+    case archive = "archivebox.fill"
+    case basket = "basket.fill"
+    case tray = "tray.full.fill"
+    case cloud = "cloud.fill"
+    case drive = "externaldrive.fill"
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .archive: return "Archive"
+        case .basket: return "Bucket"
+        case .tray: return "Tray"
+        case .cloud: return "Cloud"
+        case .drive: return "Drive"
+        }
+    }
+
+    static var current: MenuBarIconStyle {
+        MenuBarIconStyle(
+            rawValue: UserDefaults.standard.string(forKey: "menuBarSymbol") ?? ""
+        ) ?? .archive
+    }
+}
+
 // MARK: - Status item controller
 
 /// Menu bar icon that accepts drag & drop uploads and offers a small menu
@@ -35,7 +63,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = item.button {
             button.image = NSImage(
-                systemSymbolName: "archivebox.fill",
+                systemSymbolName: MenuBarIconStyle.current.rawValue,
                 accessibilityDescription: "Buckett — drop files to upload"
             )
             button.toolTip = "Buckett — drop files here to upload"
@@ -46,6 +74,25 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         menu.delegate = self
         item.menu = menu
         statusItem = item
+    }
+
+    /// Re-reads the icon style preference and updates the status button.
+    func refreshIcon() {
+        statusItem?.button?.image = NSImage(
+            systemSymbolName: MenuBarIconStyle.current.rawValue,
+            accessibilityDescription: "Buckett — drop files to upload"
+        )
+    }
+
+    // MARK: Drag hover
+
+    func dragEntered(near view: NSView?) {
+        let bucket = AppState.shared.menuBarTargetBucket() ?? "…"
+        DropAnimationController.shared.showHover(bucket: bucket, near: view)
+    }
+
+    func dragExited() {
+        DropAnimationController.shared.closeHover()
     }
 
     nonisolated func menuNeedsUpdate(_ menu: NSMenu) {
@@ -123,6 +170,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     func handleDrop(urls: [URL], near view: NSView?) {
+        DropAnimationController.shared.closeHover()
         guard let bucket = AppState.shared.handleMenuBarDrop(urls: urls) else { return }
         DropAnimationController.shared.play(
             fileURL: urls.first,
@@ -151,11 +199,13 @@ final class StatusDropView: NSView {
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
         statusButton?.isHighlighted = true
+        MenuBarController.shared.dragEntered(near: self)
         return .copy
     }
 
     override func draggingExited(_ sender: NSDraggingInfo?) {
         statusButton?.isHighlighted = false
+        MenuBarController.shared.dragExited()
     }
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
@@ -184,10 +234,28 @@ final class DropAnimationController {
     static let shared = DropAnimationController()
 
     private var panel: NSPanel?
+    private var hoverPanel: NSPanel?
 
     private init() {}
 
+    /// Shown while a drag hovers over the status icon, before the user lets go.
+    func showHover(bucket: String, near view: NSView?) {
+        guard hoverPanel == nil else { return }
+        let content = HoverDropView(bucketName: bucket, theme: ThemeStore.shared.theme)
+        hoverPanel = presentPanel(
+            rootView: AnyView(content),
+            size: NSSize(width: 224, height: 128),
+            near: view
+        )
+    }
+
+    func closeHover() {
+        hoverPanel?.close()
+        hoverPanel = nil
+    }
+
     func play(fileURL: URL?, count: Int, bucket: String, near view: NSView?) {
+        closeHover()
         panel?.close()
         panel = nil
 
@@ -204,7 +272,23 @@ final class DropAnimationController {
             bucketName: bucket,
             theme: ThemeStore.shared.theme
         )
-        let hosting = NSHostingController(rootView: content)
+        let newPanel = presentPanel(
+            rootView: AnyView(content),
+            size: NSSize(width: 224, height: 148),
+            near: view
+        )
+        panel = newPanel
+
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 2_600_000_000)
+            guard let self, self.panel === newPanel else { return }
+            newPanel.close()
+            self.panel = nil
+        }
+    }
+
+    private func presentPanel(rootView: AnyView, size: NSSize, near view: NSView?) -> NSPanel {
+        let hosting = NSHostingController(rootView: rootView)
         let newPanel = NSPanel(contentViewController: hosting)
         newPanel.styleMask = [.borderless, .nonactivatingPanel]
         newPanel.isOpaque = false
@@ -212,9 +296,8 @@ final class DropAnimationController {
         newPanel.hasShadow = false
         newPanel.level = .statusBar
         newPanel.isMovable = false
-        newPanel.setContentSize(NSSize(width: 224, height: 148))
+        newPanel.setContentSize(size)
 
-        let size = newPanel.frame.size
         var origin: NSPoint
         if let view, let window = view.window {
             let frame = window.frame
@@ -229,13 +312,59 @@ final class DropAnimationController {
         }
         newPanel.setFrameOrigin(origin)
         newPanel.orderFrontRegardless()
-        panel = newPanel
+        return newPanel
+    }
+}
 
-        Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 2_600_000_000)
-            guard let self, self.panel === newPanel else { return }
-            newPanel.close()
-            self.panel = nil
+/// Hover state: bucket pulses and invites the user to release the drag.
+struct HoverDropView: View {
+    let bucketName: String
+    let theme: AppTheme
+
+    @State private var pulsing = false
+
+    var body: some View {
+        VStack(spacing: 9) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .fill(theme.gradient)
+                    .frame(width: 50, height: 50)
+                    .overlay {
+                        Image(systemName: MenuBarIconStyle.current.rawValue)
+                            .font(.system(size: 24, weight: .semibold))
+                            .foregroundStyle(.white)
+                    }
+                    .scaleEffect(pulsing ? 1.08 : 0.98)
+
+                Image(systemName: "arrow.down")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(theme.primary)
+                    .offset(y: pulsing ? -38 : -44)
+            }
+            .frame(height: 62)
+
+            VStack(spacing: 1) {
+                Text("Release to upload")
+                    .font(.callout.weight(.semibold))
+                Text("→ \(bucketName)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+        }
+        .padding(14)
+        .frame(width: 210)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.2), radius: 14, y: 5)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true)) {
+                pulsing = true
+            }
         }
     }
 }
@@ -257,7 +386,7 @@ struct DropAnimationView: View {
                     .fill(theme.gradient)
                     .frame(width: 52, height: 52)
                     .overlay {
-                        Image(systemName: "archivebox.fill")
+                        Image(systemName: MenuBarIconStyle.current.rawValue)
                             .font(.system(size: 25, weight: .semibold))
                             .foregroundStyle(.white)
                     }
