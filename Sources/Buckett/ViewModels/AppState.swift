@@ -148,12 +148,12 @@ final class AppState: ObservableObject {
         }
     }
 
-    /// The bucket menu-bar drops currently go to: the explicitly chosen target,
-    /// else the selected bucket, else the account's first bucket.
+    /// The bucket icon-drops go to by default: the first checked drop-menu
+    /// bucket, else the selected bucket, else the account's first bucket.
     func menuBarTargetBucket() -> String? {
-        if let stored = UserDefaults.standard.string(forKey: MenuBarController.targetBucketKey),
-           buckets.contains(where: { $0.name == stored }) {
-            return stored
+        if let first = MenuBarController.dropShortlist()
+            .first(where: { name in buckets.contains { $0.name == name } }) {
+            return first
         }
         if case .bucket(let current) = sidebarSelection {
             return current
@@ -161,10 +161,11 @@ final class AppState: ObservableObject {
         return buckets.first?.name
     }
 
-    /// Queues uploads dropped on the menu bar icon. Returns the target bucket
-    /// name, or nil (with user-facing feedback) when there is nowhere to upload.
+    /// Queues uploads dropped on the menu bar icon (or one of the hover panel's
+    /// bucket rows, via `explicitBucket`). Returns the target bucket name, or
+    /// nil (with user-facing feedback) when there is nowhere to upload.
     @discardableResult
-    func handleMenuBarDrop(urls: [URL]) -> String? {
+    func handleMenuBarDrop(urls: [URL], to explicitBucket: String? = nil) -> String? {
         guard let account = selectedAccount, let client = client(for: account) else {
             openMainWindow()
             ToastCenter.shared.show(
@@ -175,7 +176,7 @@ final class AppState: ObservableObject {
             return nil
         }
 
-        let bucket = menuBarTargetBucket()
+        let bucket = explicitBucket ?? menuBarTargetBucket()
         guard let bucket else {
             openMainWindow()
             ToastCenter.shared.show(

@@ -11,6 +11,7 @@ struct ContentView: View {
             detail
         }
         .overlay(ToastHostView())
+        .overlay(UpdateProgressOverlay())
         .background(UpdateAlertHost(updates: appState.updates))
         .sheet(isPresented: $appState.showOnboarding) {
             OnboardingView()
@@ -114,6 +115,73 @@ struct UpdateAlertHost: View {
                     Text("Buckett \(version) is available. You are running \(AppVersion.current). Install now and the app will relaunch into the new version.")
                 }
             }
+    }
+}
+
+// MARK: - Update progress overlay
+
+/// Full-window overlay shown while a self-update runs: bobbing bucket glyph
+/// with a live download progress bar, then install/relaunch states.
+struct UpdateProgressOverlay: View {
+    @ObservedObject private var updater = SelfUpdater.shared
+    @Environment(\.appTheme) private var theme
+
+    @State private var bobbing = false
+
+    var body: some View {
+        if updater.isBusy {
+            ZStack {
+                Color.black.opacity(0.28)
+                    .ignoresSafeArea()
+
+                VStack(spacing: 16) {
+                    theme.glyph(size: 60)
+                        .offset(y: bobbing ? -5 : 5)
+                        .animation(
+                            .easeInOut(duration: 0.7).repeatForever(autoreverses: true),
+                            value: bobbing
+                        )
+
+                    switch updater.phase {
+                    case .downloading:
+                        VStack(spacing: 7) {
+                            ProgressView(value: updater.downloadProgress)
+                                .progressViewStyle(.linear)
+                                .tint(theme.primary)
+                                .frame(width: 220)
+                            Text("Downloading update… \(Int(updater.downloadProgress * 100))%")
+                                .font(.callout.weight(.medium))
+                                .monospacedDigit()
+                        }
+                    case .installing:
+                        VStack(spacing: 7) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("Installing…")
+                                .font(.callout.weight(.medium))
+                        }
+                    case .relaunching:
+                        Text("Relaunching…")
+                            .font(.callout.weight(.medium))
+                    case .idle, .failed:
+                        EmptyView()
+                    }
+
+                    Text("Buckett will reopen automatically")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(28)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.25), radius: 22, y: 8)
+                .onAppear { bobbing = true }
+            }
+            .transition(.opacity)
+        }
     }
 }
 
