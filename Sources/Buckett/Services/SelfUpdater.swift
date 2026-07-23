@@ -17,6 +17,10 @@ final class SelfUpdater: ObservableObject {
     }
 
     @Published var phase: Phase = .idle
+    /// 0…1 while `phase == .downloading`.
+    @Published var downloadProgress: Double = 0
+
+    private var progressObservation: NSKeyValueObservation?
 
     var isBusy: Bool {
         phase == .downloading || phase == .installing || phase == .relaunching
@@ -33,27 +37,17 @@ final class SelfUpdater: ObservableObject {
             return
         }
         phase = .downloading
-        ToastCenter.shared.show("Downloading update…", style: .info)
+        downloadProgress = 0
         Task {
             do {
-                let (tempFile, response) = try await URLSession.shared.download(from: url)
-                guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-                    throw SelfUpdateError("Download failed (HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0)). If the repository is private, download the DMG from GitHub instead.")
-                }
-                let dmg = FileManager.default.temporaryDirectory
-                    .appendingPathComponent("Buckett-update-\(UUID().uuidString).dmg")
-                try? FileManager.default.removeItem(at: dmg)
-                try FileManager.default.moveItem(at: tempFile, to: dmg)
-
+                let dmg = try await downloadWithProgress(url: url)
                 phase = .installing
-                ToastCenter.shared.show("Installing update…", style: .info)
                 let target = Bundle.main.bundleURL
                 try await Task.detached(priority: .userInitiated) {
                     try SelfUpdater.performInstall(dmg: dmg, target: target)
                 }.value
 
                 phase = .relaunching
-                ToastCenter.shared.show("Relaunching…", style: .info)
                 relaunch(target: target)
             } catch {
                 phase = .failed(error.localizedDescription)
@@ -61,6 +55,40 @@ final class SelfUpdater: ObservableObject {
                     "Update failed", detail: error.localizedDescription, style: .error
                 )
             }
+            progressObservation = nil
+        }
+    }
+
+    private func downloadWithProgress(url: URL) async throws -> URL {
+        let destination = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Buckett-update-\(UUID().uuidString).dmg")
+        return try await withCheckedThrowingContinuation { continuation in
+            let task = URLSession.shared.downloadTask(with: url) { temp, response, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                guard let temp,
+                      let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+                    continuation.resume(throwing: SelfUpdateError(
+                        "Download failed (HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0))."
+                    ))
+                    return
+                }
+                do {
+                    try FileManager.default.moveItem(at: temp, to: destination)
+                    continuation.resume(returning: destination)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+            progressObservation = task.progress.observe(\.fractionCompleted) { progress, _ in
+                let fraction = progress.fractionCompleted
+                Task { @MainActor [weak self] in
+                    self?.downloadProgress = fraction
+                }
+            }
+            task.resume()
         }
     }
 

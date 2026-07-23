@@ -39,9 +39,15 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     static let shared = MenuBarController()
 
     private var statusItem: NSStatusItem?
+    private weak var dropView: StatusDropView?
     private let menu = NSMenu()
 
-    static let targetBucketKey = "menuBarTargetBucket"
+    /// Buckets the user checked for the hover drop menu ([String]).
+    static let dropBucketsKey = "menuBarDropBuckets"
+
+    static func dropShortlist() -> [String] {
+        UserDefaults.standard.stringArray(forKey: dropBucketsKey) ?? []
+    }
 
     func setup() {
         let stored = UserDefaults.standard.object(forKey: "showMenuBarIcon")
@@ -67,9 +73,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                 accessibilityDescription: "Buckett — drop files to upload"
             )
             button.toolTip = "Buckett — drop files here to upload"
-            let dropView = StatusDropView(frame: button.bounds)
-            dropView.autoresizingMask = [.width, .height]
-            button.addSubview(dropView)
+            let view = StatusDropView(frame: button.bounds)
+            view.autoresizingMask = [.width, .height]
+            button.addSubview(view)
+            dropView = view
         }
         menu.delegate = self
         item.menu = menu
@@ -87,12 +94,23 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     // MARK: Drag hover
 
     func dragEntered(near view: NSView?) {
-        let bucket = AppState.shared.menuBarTargetBucket() ?? "…"
-        DropAnimationController.shared.showHover(bucket: bucket, near: view)
+        DropAnimationController.shared.cancelHoverClose()
+        let names = Set(AppState.shared.buckets.map(\.name))
+        var rows = Self.dropShortlist().filter { names.contains($0) }
+        if rows.isEmpty, let auto = AppState.shared.menuBarTargetBucket() {
+            rows = [auto]
+        }
+        DropAnimationController.shared.showHover(buckets: rows, near: view)
     }
 
+    /// The drag left the icon — maybe heading into the hover panel, so close
+    /// on a grace period that a targeted panel row can cancel.
     func dragExited() {
-        DropAnimationController.shared.closeHover()
+        DropAnimationController.shared.scheduleHoverClose(after: 0.9)
+    }
+
+    func dragEnded() {
+        DropAnimationController.shared.scheduleHoverClose(after: 0.4)
     }
 
     nonisolated func menuNeedsUpdate(_ menu: NSMenu) {
@@ -109,29 +127,28 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         menu.addItem(open)
         menu.addItem(.separator())
 
-        let targetItem = NSMenuItem(title: "Drop Target Bucket", action: nil, keyEquivalent: "")
+        let targetItem = NSMenuItem(title: "Drop Menu Buckets", action: nil, keyEquivalent: "")
         let submenu = NSMenu()
-        let current = UserDefaults.standard.string(forKey: Self.targetBucketKey)
+        let shortlist = Self.dropShortlist()
         let buckets = AppState.shared.buckets
         if buckets.isEmpty {
             let none = NSMenuItem(title: "No buckets loaded", action: nil, keyEquivalent: "")
             none.isEnabled = false
             submenu.addItem(none)
         } else {
-            let auto = NSMenuItem(
-                title: "Selected Bucket (automatic)",
-                action: #selector(clearTarget), keyEquivalent: ""
+            let hint = NSMenuItem(
+                title: "Check buckets to show when dragging over the icon",
+                action: nil, keyEquivalent: ""
             )
-            auto.target = self
-            auto.state = current == nil ? .on : .off
-            submenu.addItem(auto)
+            hint.isEnabled = false
+            submenu.addItem(hint)
             submenu.addItem(.separator())
             for bucket in buckets {
                 let item = NSMenuItem(
-                    title: bucket.name, action: #selector(pickTarget(_:)), keyEquivalent: ""
+                    title: bucket.name, action: #selector(toggleDropBucket(_:)), keyEquivalent: ""
                 )
                 item.target = self
-                item.state = bucket.name == current ? .on : .off
+                item.state = shortlist.contains(bucket.name) ? .on : .off
                 submenu.addItem(item)
             }
         }
@@ -161,22 +178,28 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         AppState.shared.openMainWindow()
     }
 
-    @objc private func pickTarget(_ sender: NSMenuItem) {
-        UserDefaults.standard.set(sender.title, forKey: Self.targetBucketKey)
+    @objc private func toggleDropBucket(_ sender: NSMenuItem) {
+        var shortlist = Self.dropShortlist()
+        if let index = shortlist.firstIndex(of: sender.title) {
+            shortlist.remove(at: index)
+        } else {
+            shortlist.append(sender.title)
+        }
+        UserDefaults.standard.set(shortlist, forKey: Self.dropBucketsKey)
     }
 
-    @objc private func clearTarget() {
-        UserDefaults.standard.removeObject(forKey: Self.targetBucketKey)
-    }
-
-    func handleDrop(urls: [URL], near view: NSView?) {
+    /// Drop on the icon itself (`bucket == nil` → automatic target) or on a
+    /// specific bucket row inside the hover panel.
+    func handleDrop(urls: [URL], bucket: String? = nil) {
         DropAnimationController.shared.closeHover()
-        guard let bucket = AppState.shared.handleMenuBarDrop(urls: urls) else { return }
+        guard let resolved = AppState.shared.handleMenuBarDrop(urls: urls, to: bucket) else {
+            return
+        }
         DropAnimationController.shared.play(
             fileURL: urls.first,
             count: urls.count,
-            bucket: bucket,
-            near: view
+            bucket: resolved,
+            near: dropView
         )
     }
 }
@@ -215,8 +238,13 @@ final class StatusDropView: NSView {
             options: [.urlReadingFileURLsOnly: true]
         ) as? [URL] ?? []
         guard !urls.isEmpty else { return false }
-        MenuBarController.shared.handleDrop(urls: urls, near: self)
+        MenuBarController.shared.handleDrop(urls: urls)
         return true
+    }
+
+    override func draggingEnded(_ sender: NSDraggingInfo) {
+        statusButton?.isHighlighted = false
+        MenuBarController.shared.dragEnded()
     }
 
     // Pass clicks through to the status button so its menu still opens.
@@ -235,23 +263,57 @@ final class DropAnimationController {
 
     private var panel: NSPanel?
     private var hoverPanel: NSPanel?
+    private var hoverCloseTask: Task<Void, Never>?
 
     private init() {}
 
     /// Shown while a drag hovers over the status icon, before the user lets go.
-    func showHover(bucket: String, near view: NSView?) {
-        guard hoverPanel == nil else { return }
-        let content = HoverDropView(bucketName: bucket, theme: ThemeStore.shared.theme)
+    /// Each listed bucket is its own drop zone.
+    func showHover(buckets: [String], near view: NSView?) {
+        guard hoverPanel == nil, !buckets.isEmpty else { return }
+        let content = BucketDropListView(
+            buckets: buckets,
+            theme: ThemeStore.shared.theme,
+            onDrop: { bucket, urls in
+                MenuBarController.shared.handleDrop(urls: urls, bucket: bucket)
+            },
+            onTargetedChange: { targeted in
+                if targeted {
+                    DropAnimationController.shared.cancelHoverClose()
+                } else {
+                    DropAnimationController.shared.scheduleHoverClose(after: 0.9)
+                }
+            }
+        )
+        let height = CGFloat(66 + buckets.count * 46)
         hoverPanel = presentPanel(
             rootView: AnyView(content),
-            size: NSSize(width: 224, height: 128),
+            size: NSSize(width: 248, height: height),
             near: view
         )
     }
 
     func closeHover() {
+        hoverCloseTask?.cancel()
+        hoverCloseTask = nil
         hoverPanel?.close()
         hoverPanel = nil
+    }
+
+    func cancelHoverClose() {
+        hoverCloseTask?.cancel()
+        hoverCloseTask = nil
+    }
+
+    /// Closes the hover panel after a grace period, so a drag can travel from
+    /// the icon down into the panel without it vanishing mid-way.
+    func scheduleHoverClose(after seconds: TimeInterval) {
+        hoverCloseTask?.cancel()
+        hoverCloseTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            guard !Task.isCancelled else { return }
+            self?.closeHover()
+        }
     }
 
     func play(fileURL: URL?, count: Int, bucket: String, near view: NSView?) {
@@ -316,55 +378,88 @@ final class DropAnimationController {
     }
 }
 
-/// Hover state: bucket pulses and invites the user to release the drag.
-struct HoverDropView: View {
-    let bucketName: String
+/// Hover state: a list of bucket drop zones. Drop on the icon itself for the
+/// automatic target, or move down and drop on a specific bucket.
+struct BucketDropListView: View {
+    let buckets: [String]
     let theme: AppTheme
-
-    @State private var pulsing = false
+    let onDrop: (String, [URL]) -> Void
+    let onTargetedChange: (Bool) -> Void
 
     var body: some View {
-        VStack(spacing: 9) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    .fill(theme.gradient)
-                    .frame(width: 50, height: 50)
-                    .overlay {
-                        Image(systemName: MenuBarIconStyle.current.rawValue)
-                            .font(.system(size: 24, weight: .semibold))
-                            .foregroundStyle(.white)
-                    }
-                    .scaleEffect(pulsing ? 1.08 : 0.98)
-
-                Image(systemName: "arrow.down")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(theme.primary)
-                    .offset(y: pulsing ? -38 : -44)
-            }
-            .frame(height: 62)
-
-            VStack(spacing: 1) {
-                Text("Release to upload")
-                    .font(.callout.weight(.semibold))
-                Text("→ \(bucketName)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+        VStack(spacing: 6) {
+            Text(buckets.count == 1 ? "Release to upload" : "Drop on a bucket")
+                .font(.callout.weight(.semibold))
+            ForEach(buckets, id: \.self) { bucket in
+                BucketDropRow(
+                    bucket: bucket,
+                    theme: theme,
+                    onDrop: onDrop,
+                    onTargetedChange: onTargetedChange
+                )
             }
         }
-        .padding(14)
-        .frame(width: 210)
+        .padding(12)
+        .frame(width: 236)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.2), radius: 14, y: 5)
-        .onAppear {
-            withAnimation(.easeInOut(duration: 0.32).repeatForever(autoreverses: true)) {
-                pulsing = true
+    }
+}
+
+struct BucketDropRow: View {
+    let bucket: String
+    let theme: AppTheme
+    let onDrop: (String, [URL]) -> Void
+    let onTargetedChange: (Bool) -> Void
+
+    @State private var targeted = false
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "tray.full.fill")
+                .foregroundStyle(targeted ? AnyShapeStyle(theme.gradient) : AnyShapeStyle(.secondary))
+            Text(bucket)
+                .font(.callout.weight(.medium))
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Spacer()
+            Image(systemName: "arrow.down.circle\(targeted ? ".fill" : "")")
+                .foregroundStyle(targeted ? theme.primary : Color.secondary)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
+        .background(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(targeted ? theme.primary.opacity(0.18) : Color.primary.opacity(0.045))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .strokeBorder(
+                    targeted ? theme.primary.opacity(0.8) : Color.primary.opacity(0.07),
+                    lineWidth: targeted ? 1.5 : 1
+                )
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 9))
+        .animation(.easeOut(duration: 0.12), value: targeted)
+        .onDrop(
+            of: [.fileURL],
+            isTargeted: Binding(
+                get: { targeted },
+                set: { newValue in
+                    targeted = newValue
+                    onTargetedChange(newValue)
+                }
+            )
+        ) { providers in
+            FileDrop.loadFileURLs(from: providers) { urls in
+                guard !urls.isEmpty else { return }
+                onDrop(bucket, urls)
             }
+            return true
         }
     }
 }
