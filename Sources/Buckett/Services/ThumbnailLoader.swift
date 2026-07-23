@@ -2,7 +2,10 @@ import AppKit
 import Foundation
 
 /// Downloads and caches small image thumbnails for the grid view.
-actor ThumbnailLoader {
+/// Main-actor bound so NSImage never crosses an isolation boundary; the actual
+/// network fetch still happens off the main thread inside URLSession.
+@MainActor
+final class ThumbnailLoader {
     static let shared = ThumbnailLoader()
 
     /// Images larger than this are not fetched for thumbnails.
@@ -10,7 +13,6 @@ actor ThumbnailLoader {
     static let thumbnailSide: CGFloat = 256
 
     private let cache = NSCache<NSString, NSImage>()
-    private var inFlight: [String: Task<NSImage?, Never>] = [:]
 
     private init() {
         cache.countLimit = 500
@@ -23,23 +25,13 @@ actor ThumbnailLoader {
         if let cached = cache.object(forKey: cacheKey) {
             return cached
         }
-        if let existing = inFlight[cacheKey as String] {
-            return await existing.value
-        }
+        guard let data = try? await client.getObjectData(bucket: bucket, key: object.key),
+              let image = NSImage(data: data)
+        else { return nil }
 
-        let task = Task<NSImage?, Never> {
-            guard let data = try? await client.getObjectData(bucket: bucket, key: object.key),
-                  let image = NSImage(data: data)
-            else { return nil }
-            return Self.downscale(image, to: Self.thumbnailSide)
-        }
-        inFlight[cacheKey as String] = task
-        let image = await task.value
-        inFlight[cacheKey as String] = nil
-        if let image {
-            cache.setObject(image, forKey: cacheKey)
-        }
-        return image
+        let thumbnail = Self.downscale(image, to: Self.thumbnailSide)
+        cache.setObject(thumbnail, forKey: cacheKey)
+        return thumbnail
     }
 
     private static func downscale(_ image: NSImage, to side: CGFloat) -> NSImage {

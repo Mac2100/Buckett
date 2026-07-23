@@ -6,7 +6,7 @@ import Foundation
 final class AccountStore: ObservableObject {
     @Published private(set) var accounts: [Account] = []
 
-    static var supportDirectory: URL {
+    nonisolated static var supportDirectory: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
             .first ?? FileManager.default.temporaryDirectory
         return base.appendingPathComponent("Buckett", isDirectory: true)

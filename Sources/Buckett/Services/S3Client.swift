@@ -263,7 +263,7 @@ final class S3Client {
             if key == prefix, key.hasSuffix("/") { continue }
             var object = RemoteObject(key: key)
             object.size = Int64(node["Size"]?.trimmedText ?? "") ?? 0
-            object.lastModified = node["LastModified"]?.trimmedText.flatMap(S3Date.parse)
+            object.lastModified = (node["LastModified"]?.trimmedText).flatMap(S3Date.parse)
             object.eTag = node["ETag"]?.trimmedText.replacingOccurrences(of: "\"", with: "")
             object.storageClass = node["StorageClass"]?.trimmedText
             object.isFolder = key.hasSuffix("/") && object.size == 0
