@@ -292,6 +292,7 @@ struct AccountEditorView: View {
 
 struct AppearanceSettingsView: View {
     @EnvironmentObject private var themeStore: ThemeStore
+    @AppStorage("menuBarSymbol") private var menuBarSymbol = MenuBarIconStyle.archive.rawValue
 
     private let swatchColumns = [GridItem(.adaptive(minimum: 108, maximum: 150), spacing: 12)]
 
@@ -312,8 +313,59 @@ struct AppearanceSettingsView: View {
                 }
                 .padding(.vertical, 4)
             }
+
+            Section("Menu Bar Icon") {
+                HStack(spacing: 10) {
+                    ForEach(MenuBarIconStyle.allCases) { style in
+                        iconSwatch(style)
+                    }
+                }
+                .padding(.vertical, 4)
+                Text("Used for the menu bar drop target and its animations.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
+        .onChange(of: menuBarSymbol) { _, _ in
+            MenuBarController.shared.refreshIcon()
+        }
+    }
+
+    private func iconSwatch(_ style: MenuBarIconStyle) -> some View {
+        let isSelected = menuBarSymbol == style.rawValue
+        return Button {
+            menuBarSymbol = style.rawValue
+        } label: {
+            VStack(spacing: 6) {
+                Image(systemName: style.rawValue)
+                    .font(.system(size: 19))
+                    .frame(height: 24)
+                Text(style.label)
+                    .font(.caption2)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 9)
+            .background(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(
+                        isSelected
+                            ? themeStore.theme.primary.opacity(0.12)
+                            : Color.primary.opacity(0.03)
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .strokeBorder(
+                        isSelected
+                            ? themeStore.theme.primary.opacity(0.7)
+                            : Color.primary.opacity(0.07),
+                        lineWidth: isSelected ? 1.5 : 1
+                    )
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 9))
+        }
+        .buttonStyle(.plain)
     }
 
     private func themeSwatch(_ theme: AppTheme) -> some View {

@@ -136,6 +136,19 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// The bucket menu-bar drops currently go to: the explicitly chosen target,
+    /// else the selected bucket, else the account's first bucket.
+    func menuBarTargetBucket() -> String? {
+        if let stored = UserDefaults.standard.string(forKey: MenuBarController.targetBucketKey),
+           buckets.contains(where: { $0.name == stored }) {
+            return stored
+        }
+        if case .bucket(let current) = sidebarSelection {
+            return current
+        }
+        return buckets.first?.name
+    }
+
     /// Queues uploads dropped on the menu bar icon. Returns the target bucket
     /// name, or nil (with user-facing feedback) when there is nowhere to upload.
     @discardableResult
@@ -150,15 +163,7 @@ final class AppState: ObservableObject {
             return nil
         }
 
-        var bucket: String?
-        if let stored = UserDefaults.standard.string(forKey: MenuBarController.targetBucketKey),
-           buckets.contains(where: { $0.name == stored }) {
-            bucket = stored
-        } else if case .bucket(let current) = sidebarSelection {
-            bucket = current
-        } else {
-            bucket = buckets.first?.name
-        }
+        let bucket = menuBarTargetBucket()
         guard let bucket else {
             openMainWindow()
             ToastCenter.shared.show(
