@@ -5,6 +5,7 @@ import Charts
 /// (local history), file-type breakdown, and largest objects.
 struct StatisticsView: View {
     @EnvironmentObject private var appState: AppState
+    @Environment(\.appTheme) private var theme
     @ObservedObject private var history = UploadHistory.shared
     let bucket: String
 
@@ -59,14 +60,14 @@ struct StatisticsView: View {
                 value: stats?.formattedSize ?? "—",
                 caption: stats.map { "Total \($0.objectCount) files" } ?? "Run analyze",
                 symbol: "internaldrive.fill",
-                color: Brand.teal
+                color: theme.secondary
             )
             statCard(
                 title: "Objects",
                 value: stats.map { "\($0.objectCount)" } ?? "—",
                 caption: stats.map { "\($0.byExtension.count) file types" } ?? "Run analyze",
                 symbol: "doc.on.doc.fill",
-                color: Brand.indigo
+                color: theme.primary
             )
             statCard(
                 title: "Est. Monthly Cost",
@@ -106,7 +107,7 @@ struct StatisticsView: View {
                 }
             }
             .buttonStyle(.borderedProminent)
-            .tint(Brand.indigo)
+            .tint(theme.primary)
             .disabled(analyzing)
         }
         .padding(14)
@@ -194,7 +195,7 @@ struct StatisticsView: View {
         guard bytes > 0 else { return Color.primary.opacity(0.06) }
         let mb = Double(bytes) / 1_048_576
         let intensity = min(1, 0.25 + log10(max(1, mb)) / 4)
-        return Brand.teal.opacity(intensity)
+        return theme.secondary.opacity(intensity)
     }
 
     private var recentUploadsCard: some View {
@@ -226,7 +227,7 @@ struct StatisticsView: View {
                                 .fill(Color.primary.opacity(0.07))
                                 .overlay(alignment: .leading) {
                                     Capsule()
-                                        .fill(Brand.gradient)
+                                        .fill(theme.gradient)
                                         .frame(
                                             width: proxy.size.width
                                                 * CGFloat(Double(entry.day?.bytes ?? 0) / Double(maxBytes))

@@ -60,6 +60,7 @@ struct ObjectGridView: View {
 }
 
 struct ObjectGridItem: View {
+    @Environment(\.appTheme) private var theme
     let object: RemoteObject
     let isSelected: Bool
     let bucket: String
@@ -132,7 +133,7 @@ struct ObjectGridItem: View {
                 Image(systemName: object.symbolName)
                     .font(.system(size: 36))
                     .foregroundStyle(
-                        object.isFolder ? AnyShapeStyle(Brand.gradient) : AnyShapeStyle(.secondary)
+                        object.isFolder ? AnyShapeStyle(theme.gradient) : AnyShapeStyle(.secondary)
                     )
             }
         }

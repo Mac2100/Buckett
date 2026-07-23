@@ -5,6 +5,7 @@ import SwiftUI
 struct MoveSheet: View {
     @ObservedObject var model: BrowserModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appTheme) private var theme
 
     @State private var browsePrefix = ""
     @State private var foldersHere: [RemoteObject] = []
@@ -94,7 +95,7 @@ struct MoveSheet: View {
                     )
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(Brand.indigo)
+                .tint(theme.primary)
                 .keyboardShortcut(.defaultAction)
                 .disabled(movingFiles.isEmpty)
             }
@@ -158,7 +159,7 @@ struct MoveSheet: View {
                         } label: {
                             HStack(spacing: 7) {
                                 Image(systemName: "folder")
-                                    .foregroundStyle(Brand.teal)
+                                    .foregroundStyle(theme.secondary)
                                 Text(folder.name)
                                     .font(.callout)
                                 Spacer()

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SidebarView: View {
     @EnvironmentObject private var appState: AppState
+    @Environment(\.appTheme) private var theme
     @State private var showNewBucket = false
 
     var body: some View {
@@ -83,7 +84,7 @@ struct SidebarView: View {
 
     private var header: some View {
         HStack(spacing: 9) {
-            Brand.glyph(size: 28)
+            theme.glyph(size: 28)
             Text("Buckett")
                 .font(.title3.weight(.bold))
             Spacer()
@@ -124,7 +125,7 @@ struct SidebarView: View {
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: appState.selectedAccount?.provider.symbolName ?? "cloud")
-                        .foregroundStyle(Brand.gradient)
+                        .foregroundStyle(theme.gradient)
                     VStack(alignment: .leading, spacing: 0) {
                         Text(currentAccountName)
                             .font(.callout.weight(.medium))
@@ -200,6 +201,7 @@ struct SidebarView: View {
 // MARK: - Bucket card
 
 struct BucketRowCard: View {
+    @Environment(\.appTheme) private var theme
     let bucket: Bucket
     let stats: BucketStats?
     let isSelected: Bool
@@ -212,7 +214,7 @@ struct BucketRowCard: View {
             VStack(alignment: .leading, spacing: 7) {
                 HStack(spacing: 8) {
                     Image(systemName: "tray.full.fill")
-                        .foregroundStyle(isSelected ? AnyShapeStyle(Brand.gradient) : AnyShapeStyle(.secondary))
+                        .foregroundStyle(isSelected ? AnyShapeStyle(theme.gradient) : AnyShapeStyle(.secondary))
                     Text(bucket.name)
                         .font(.callout.weight(.semibold))
                         .lineLimit(1)
@@ -263,6 +265,7 @@ struct BucketRowCard: View {
 struct NewBucketSheet: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appTheme) private var theme
 
     @State private var name = ""
     @State private var creating = false
@@ -281,7 +284,7 @@ struct NewBucketSheet: View {
         VStack(spacing: 16) {
             Image(systemName: "tray.full.fill")
                 .font(.system(size: 30))
-                .foregroundStyle(Brand.gradient)
+                .foregroundStyle(theme.gradient)
             Text("New Bucket")
                 .font(.title3.weight(.semibold))
 

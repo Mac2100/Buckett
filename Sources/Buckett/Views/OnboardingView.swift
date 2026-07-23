@@ -5,6 +5,7 @@ import SwiftUI
 struct OnboardingView: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appTheme) private var theme
 
     enum Step: Int, CaseIterable {
         case provider, connection, credentials, finish
@@ -78,7 +79,7 @@ struct OnboardingView: View {
                     Rectangle()
                         .fill(
                             s.rawValue <= step.rawValue
-                                ? AnyShapeStyle(Brand.gradient)
+                                ? AnyShapeStyle(theme.gradient)
                                 : AnyShapeStyle(Color.primary.opacity(0.12))
                         )
                         .frame(height: 2)
@@ -91,7 +92,7 @@ struct OnboardingView: View {
                         Circle()
                             .fill(
                                 s.rawValue <= step.rawValue
-                                    ? AnyShapeStyle(Brand.gradient)
+                                    ? AnyShapeStyle(theme.gradient)
                                     : AnyShapeStyle(Color.primary.opacity(0.08))
                             )
                             .frame(width: 34, height: 34)
@@ -149,7 +150,7 @@ struct OnboardingView: View {
             VStack(spacing: 10) {
                 Image(systemName: p.symbolName)
                     .font(.system(size: 26))
-                    .foregroundStyle(provider == p ? AnyShapeStyle(Brand.gradient) : AnyShapeStyle(.secondary))
+                    .foregroundStyle(provider == p ? AnyShapeStyle(theme.gradient) : AnyShapeStyle(.secondary))
                 Text(p.displayName)
                     .font(.callout.weight(.medium))
             }
@@ -157,12 +158,12 @@ struct OnboardingView: View {
             .padding(.vertical, 22)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(provider == p ? Brand.indigo.opacity(0.10) : Color.primary.opacity(0.04))
+                    .fill(provider == p ? theme.primary.opacity(0.10) : Color.primary.opacity(0.04))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .strokeBorder(
-                        provider == p ? Brand.indigo.opacity(0.7) : Color.primary.opacity(0.08),
+                        provider == p ? theme.primary.opacity(0.7) : Color.primary.opacity(0.08),
                         lineWidth: provider == p ? 1.5 : 1
                     )
             )
@@ -246,7 +247,7 @@ struct OnboardingView: View {
 
     private var finishStep: some View {
         VStack(spacing: 18) {
-            Brand.glyph(size: 56)
+            theme.glyph(size: 56)
             Text(name.isEmpty ? provider.displayName : name)
                 .font(.title3.weight(.semibold))
             Text("Run a quick connection test, then you're done.")

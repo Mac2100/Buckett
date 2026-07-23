@@ -124,12 +124,13 @@ struct TransfersView: View {
 struct TransferRowCard: View {
     @ObservedObject var task: TransferTask
     let transfers: TransferManager
+    @Environment(\.appTheme) private var theme
 
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: task.symbolName)
                 .font(.title3)
-                .foregroundStyle(task.kind == .upload ? Brand.indigo : Brand.teal)
+                .foregroundStyle(task.kind == .upload ? theme.primary : theme.secondary)
                 .frame(width: 24)
 
             VStack(alignment: .leading, spacing: 4) {
@@ -157,7 +158,7 @@ struct TransferRowCard: View {
                     ProgressView(value: task.fractionCompleted)
                         .progressViewStyle(.linear)
                         .controlSize(.small)
-                        .tint(task.kind == .upload ? Brand.indigo : Brand.teal)
+                        .tint(task.kind == .upload ? theme.primary : theme.secondary)
                     HStack(spacing: 10) {
                         Text("\(Int(task.fractionCompleted * 100))%")
                         Text("\(task.transferredBytes.formattedBytes) / \(task.totalBytes.formattedBytes)")

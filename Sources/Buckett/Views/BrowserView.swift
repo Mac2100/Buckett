@@ -3,6 +3,7 @@ import UniformTypeIdentifiers
 
 struct BrowserView: View {
     @StateObject private var model: BrowserModel
+    @Environment(\.appTheme) private var theme
 
     @State private var previewObject: RemoteObject?
     @State private var metadataObject: RemoteObject?
@@ -115,7 +116,7 @@ struct BrowserView: View {
                     .font(.system(size: 12, weight: .medium))
             }
             .buttonStyle(.borderedProminent)
-            .tint(Brand.indigo)
+            .tint(theme.primary)
             .help("Upload files or folders")
 
             CapsuleSegments(
@@ -254,7 +255,7 @@ struct BrowserView: View {
             VStack(spacing: 12) {
                 Image(systemName: model.filterText.isEmpty ? "folder" : "magnifyingglass")
                     .font(.system(size: 38))
-                    .foregroundStyle(Brand.gradient)
+                    .foregroundStyle(theme.gradient)
                 Text(model.filterText.isEmpty ? "This folder has no files yet" : "No matches")
                     .font(.title3.weight(.semibold))
                 Text(
@@ -274,7 +275,7 @@ struct BrowserView: View {
                         Label("Upload Files", systemImage: "square.and.arrow.up")
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(Brand.indigo)
+                    .tint(theme.primary)
                     .controlSize(.large)
                     .padding(.top, 4)
                 }
@@ -288,9 +289,9 @@ struct BrowserView: View {
 
     private var dropOverlay: some View {
         RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .strokeBorder(Brand.indigo, style: StrokeStyle(lineWidth: 3, dash: [8]))
+            .strokeBorder(theme.primary, style: StrokeStyle(lineWidth: 3, dash: [8]))
             .background(
-                Brand.indigo.opacity(0.07),
+                theme.primary.opacity(0.07),
                 in: RoundedRectangle(cornerRadius: 12, style: .continuous)
             )
             .overlay {
@@ -472,7 +473,7 @@ struct BrowserView: View {
         VStack(spacing: 14) {
             Image(systemName: "folder.badge.plus")
                 .font(.system(size: 28))
-                .foregroundStyle(Brand.gradient)
+                .foregroundStyle(theme.gradient)
             Text("New Folder").font(.title3.weight(.semibold))
             TextField("Folder name", text: $newFolderName)
                 .textFieldStyle(.roundedBorder)
