@@ -31,6 +31,7 @@ struct MenuDropTarget: Hashable {
 /// Row shown in the hover drop panel.
 struct DropRowModel: Identifiable {
     let target: MenuDropTarget
+    let displayName: String
     let accountName: String
     var id: String { target.encoded }
 }
@@ -129,20 +130,25 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     func dragEntered(near view: NSView?) {
         DropAnimationController.shared.cancelHoverClose()
         let appState = AppState.shared
+        func makeRow(_ target: MenuDropTarget) -> DropRowModel? {
+            guard let account = appState.accountStore.accounts
+                .first(where: { $0.id == target.accountID }) else { return nil }
+            let accountName = account.name.isEmpty ? account.provider.displayName : account.name
+            return DropRowModel(
+                target: target,
+                displayName: BucketAliases.shared.displayName(
+                    accountID: target.accountID, bucket: target.bucket
+                ),
+                accountName: accountName
+            )
+        }
+
         var rows: [DropRowModel] = Self.dropShortlist()
             .compactMap { MenuDropTarget(encoded: $0) }
             .filter { appState.isValidDropTarget($0) }
-            .compactMap { target in
-                guard let account = appState.accountStore.accounts
-                    .first(where: { $0.id == target.accountID }) else { return nil }
-                let name = account.name.isEmpty ? account.provider.displayName : account.name
-                return DropRowModel(target: target, accountName: name)
-            }
-        if rows.isEmpty, let auto = appState.menuBarAutoTarget() {
-            let name = appState.accountStore.accounts
-                .first { $0.id == auto.accountID }
-                .map { $0.name.isEmpty ? $0.provider.displayName : $0.name } ?? ""
-            rows = [DropRowModel(target: auto, accountName: name)]
+            .compactMap(makeRow)
+        if rows.isEmpty, let auto = appState.menuBarAutoTarget(), let row = makeRow(auto) {
+            rows = [row]
         }
         DropAnimationController.shared.showHover(rows: rows, near: view)
     }
@@ -194,14 +200,15 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             submenu.addItem(header)
             for bucket in buckets {
                 let target = MenuDropTarget(accountID: account.id, bucket: bucket.name)
-                let item = NSMenuItem(
-                    title: bucket.name, action: #selector(toggleDropBucket(_:)), keyEquivalent: ""
+                let title = BucketAliases.shared.displayName(
+                    accountID: account.id, bucket: bucket.name
                 )
-                item.target = self
-                item.representedObject = target.encoded
-                item.state = shortlist.contains(target.encoded) ? .on : .off
-                item.indentationLevel = 1
-                submenu.addItem(item)
+                submenu.addItem(checkboxItem(
+                    title: title,
+                    realName: bucket.name,
+                    encoded: target.encoded,
+                    checked: shortlist.contains(target.encoded)
+                ))
                 addedAny = true
             }
         }
@@ -236,8 +243,33 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         AppState.shared.openMainWindow()
     }
 
-    @objc private func toggleDropBucket(_ sender: NSMenuItem) {
-        guard let encoded = sender.representedObject as? String else { return }
+    /// Checkbox rendered inside the menu item's custom view — clicking it does
+    /// NOT dismiss the menu, so several buckets can be checked in one visit.
+    private func checkboxItem(
+        title: String, realName: String, encoded: String, checked: Bool
+    ) -> NSMenuItem {
+        let item = NSMenuItem()
+        let checkbox = NSButton(
+            checkboxWithTitle: title,
+            target: self,
+            action: #selector(checkboxToggled(_:))
+        )
+        checkbox.state = checked ? .on : .off
+        checkbox.identifier = NSUserInterfaceItemIdentifier(encoded)
+        checkbox.font = NSFont.menuFont(ofSize: NSFont.systemFontSize(for: .regular))
+        if title != realName {
+            checkbox.toolTip = realName
+        }
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 280, height: 26))
+        checkbox.frame = NSRect(x: 14, y: 4, width: 252, height: 18)
+        checkbox.autoresizingMask = [.width]
+        container.addSubview(checkbox)
+        item.view = container
+        return item
+    }
+
+    @objc private func checkboxToggled(_ sender: NSButton) {
+        guard let encoded = sender.identifier?.rawValue else { return }
         var shortlist = Self.dropShortlist()
         if let index = shortlist.firstIndex(of: encoded) {
             shortlist.remove(at: index)
@@ -254,10 +286,13 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         guard let resolved = AppState.shared.handleMenuBarDrop(urls: urls, to: target) else {
             return
         }
+        let display = BucketAliases.shared.displayName(
+            accountID: resolved.accountID, bucket: resolved.bucket
+        )
         DropAnimationController.shared.play(
             fileURL: urls.first,
             count: urls.count,
-            bucket: resolved,
+            bucket: display,
             near: dropView
         )
     }
@@ -482,7 +517,7 @@ struct BucketDropRow: View {
             Image(systemName: "tray.full.fill")
                 .foregroundStyle(targeted ? AnyShapeStyle(theme.gradient) : AnyShapeStyle(.secondary))
             VStack(alignment: .leading, spacing: 0) {
-                Text(row.target.bucket)
+                Text(row.displayName)
                     .font(.callout.weight(.medium))
                     .lineLimit(1)
                     .truncationMode(.middle)

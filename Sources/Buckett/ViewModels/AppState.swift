@@ -197,10 +197,10 @@ final class AppState: ObservableObject {
 
     /// Queues uploads dropped on the menu bar icon (or one of the hover panel's
     /// bucket rows, via `target` — which may belong to any account). Returns the
-    /// bucket name for the animation, or nil (with feedback) when there is
+    /// resolved target for the animation, or nil (with feedback) when there is
     /// nowhere to upload.
     @discardableResult
-    func handleMenuBarDrop(urls: [URL], to target: MenuDropTarget? = nil) -> String? {
+    func handleMenuBarDrop(urls: [URL], to target: MenuDropTarget? = nil) -> MenuDropTarget? {
         guard let resolved = target ?? menuBarAutoTarget() else {
             openMainWindow()
             ToastCenter.shared.show(
@@ -238,7 +238,7 @@ final class AppState: ObservableObject {
                 body: "\(expanded.count) file\(expanded.count == 1 ? "" : "s") → \(bucket)"
             )
         }
-        return bucket
+        return resolved
     }
 
     // MARK: - Analytics
