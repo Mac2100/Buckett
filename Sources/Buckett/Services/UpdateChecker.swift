@@ -37,6 +37,30 @@ final class UpdateChecker: ObservableObject {
         Task { await check() }
     }
 
+    /// Runs a check and, for user-initiated checks, surfaces the "nothing new"
+    /// outcomes as toasts (silent launch checks stay silent).
+    func check(userInitiated: Bool) async {
+        await check()
+        guard userInitiated else { return }
+        switch status {
+        case .upToDate:
+            ToastCenter.shared.show(
+                "No updates available",
+                detail: "Buckett \(AppVersion.current) is the latest version"
+            )
+        case .noReleasesVisible:
+            ToastCenter.shared.show(
+                "No releases visible",
+                detail: "Private repositories can't be checked anonymously",
+                style: .info
+            )
+        case .failed(let message):
+            ToastCenter.shared.show("Update check failed", detail: message, style: .error)
+        case .idle, .checking, .updateAvailable:
+            break
+        }
+    }
+
     func check() async {
         status = .checking
         defer { lastChecked = Date() }

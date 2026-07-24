@@ -525,7 +525,7 @@ struct UpdateStatusView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
                 Button {
-                    Task { await updates.check() }
+                    Task { await updates.check(userInitiated: true) }
                 } label: {
                     if updates.status == .checking {
                         ProgressView().controlSize(.small)
