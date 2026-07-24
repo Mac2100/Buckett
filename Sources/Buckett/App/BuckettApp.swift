@@ -22,7 +22,7 @@ struct BuckettApp: App {
         .commands {
             CommandGroup(after: .appInfo) {
                 Button("Check for Updates…") {
-                    Task { await appState.updates.check() }
+                    Task { await appState.updates.check(userInitiated: true) }
                 }
             }
             SidebarCommands()
