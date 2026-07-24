@@ -305,15 +305,7 @@ struct AliasSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appTheme) private var theme
-    @State private var alias: String
-
-    init(accountID: UUID, bucket: String) {
-        self.accountID = accountID
-        self.bucket = bucket
-        _alias = State(
-            initialValue: BucketAliases.shared.alias(accountID: accountID, bucket: bucket) ?? ""
-        )
-    }
+    @State private var alias = ""
 
     var body: some View {
         VStack(spacing: 14) {
@@ -354,6 +346,9 @@ struct AliasSheet: View {
             .frame(width: 260)
         }
         .padding(22)
+        .onAppear {
+            alias = BucketAliases.shared.alias(accountID: accountID, bucket: bucket) ?? ""
+        }
     }
 }
 
