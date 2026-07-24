@@ -21,7 +21,12 @@ final class BrowserModel: ObservableObject {
     @Published var isBusy = false
     @Published var errorMessage: String?
     @Published var filterText = ""
-    @Published var viewMode: ViewMode
+    @Published var viewMode: ViewMode {
+        didSet {
+            // Toggling grid/list IS the preference — remember it everywhere.
+            UserDefaults.standard.set(viewMode.rawValue, forKey: "defaultViewMode")
+        }
+    }
     @Published var sortField: SortField = .name
     @Published var sortAscending = true
     @Published var selection = Set<String>()
