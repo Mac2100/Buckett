@@ -45,6 +45,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MenuBarController.shared.setup()
     }
 
+    /// Closing the last window must NOT quit the app — Buckett lives on in the
+    /// menu bar; the window comes back via Dock click or "Open Buckett".
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
+    }
+
     /// Dock icon clicked with no visible windows (e.g. after closing the main
     /// window with the red X): recreate/reopen the main window.
     func applicationShouldHandleReopen(
