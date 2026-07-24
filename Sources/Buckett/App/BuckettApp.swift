@@ -7,7 +7,7 @@ struct BuckettApp: App {
     @StateObject private var themeStore = ThemeStore.shared
 
     var body: some Scene {
-        WindowGroup {
+        Window("Buckett", id: "main") {
             ContentView()
                 .environmentObject(appState)
                 .environmentObject(themeStore)
@@ -43,5 +43,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         ThemeStore.shared.applyAppearance()
         MenuBarController.shared.setup()
+    }
+
+    /// Dock icon clicked with no visible windows (e.g. after closing the main
+    /// window with the red X): recreate/reopen the main window.
+    func applicationShouldHandleReopen(
+        _ sender: NSApplication, hasVisibleWindows flag: Bool
+    ) -> Bool {
+        if !flag {
+            AppState.shared.openMainWindow()
+            return false
+        }
+        return true
     }
 }

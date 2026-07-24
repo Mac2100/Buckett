@@ -168,14 +168,22 @@ final class AppState: ObservableObject {
         await loadBuckets()
     }
 
-    // MARK: - Menu bar drops
+    // MARK: - Main window
+
+    /// Captured from the SwiftUI environment so AppKit contexts (Dock reopen,
+    /// menu bar "Open Buckett") can recreate the window after it was closed.
+    var openWindowAction: OpenWindowAction?
 
     func openMainWindow() {
         NSApp.activate(ignoringOtherApps: true)
-        for window in NSApp.windows where window.canBecomeKey {
-            window.makeKeyAndOrderFront(nil)
+        if let visible = NSApp.windows.first(where: { $0.isVisible && $0.canBecomeKey }) {
+            visible.makeKeyAndOrderFront(nil)
+        } else {
+            openWindowAction?(id: "main")
         }
     }
+
+    // MARK: - Menu bar drops
 
     /// Where icon-drops go by default: the first checked drop-menu bucket (any
     /// account), else the selected bucket, else the account's first bucket.

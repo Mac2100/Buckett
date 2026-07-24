@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var appState: AppState
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         NavigationSplitView {
@@ -17,6 +18,9 @@ struct ContentView: View {
             OnboardingView()
         }
         .navigationTitle("Buckett")
+        .onAppear {
+            appState.openWindowAction = openWindow
+        }
     }
 
     @ViewBuilder
