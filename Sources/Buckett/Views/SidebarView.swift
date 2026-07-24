@@ -3,7 +3,9 @@ import SwiftUI
 struct SidebarView: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.appTheme) private var theme
+    @ObservedObject private var aliasStore = BucketAliases.shared
     @State private var showNewBucket = false
+    @State private var aliasTarget: Bucket?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -49,11 +51,31 @@ struct SidebarView: View {
                     ForEach(appState.buckets) { bucket in
                         BucketRowCard(
                             bucket: bucket,
+                            displayName: displayName(for: bucket),
                             stats: appState.stats[bucket.name],
                             isSelected: appState.sidebarSelection == .bucket(bucket.name)
                         ) {
                             appState.sidebarSelection = .bucket(bucket.name)
                         }
+                        .contextMenu {
+                            Button(
+                                aliasFor(bucket) == nil ? "Set Alias…" : "Edit Alias…"
+                            ) {
+                                aliasTarget = bucket
+                            }
+                            if aliasFor(bucket) != nil {
+                                Button("Remove Alias") {
+                                    if let accountID = appState.selectedAccountID {
+                                        aliasStore.setAlias(
+                                            nil, accountID: accountID, bucket: bucket.name
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        .help(
+                            aliasFor(bucket) == nil ? bucket.name : "Bucket: \(bucket.name)"
+                        )
                     }
 
                     if let error = appState.bucketsError {
@@ -80,6 +102,20 @@ struct SidebarView: View {
         .sheet(isPresented: $showNewBucket) {
             NewBucketSheet()
         }
+        .sheet(item: $aliasTarget) { bucket in
+            if let accountID = appState.selectedAccountID {
+                AliasSheet(accountID: accountID, bucket: bucket.name)
+            }
+        }
+    }
+
+    private func aliasFor(_ bucket: Bucket) -> String? {
+        guard let accountID = appState.selectedAccountID else { return nil }
+        return aliasStore.alias(accountID: accountID, bucket: bucket.name)
+    }
+
+    private func displayName(for bucket: Bucket) -> String {
+        aliasFor(bucket) ?? bucket.name
     }
 
     private var header: some View {
@@ -203,6 +239,7 @@ struct SidebarView: View {
 struct BucketRowCard: View {
     @Environment(\.appTheme) private var theme
     let bucket: Bucket
+    var displayName: String? = nil
     let stats: BucketStats?
     let isSelected: Bool
     let action: () -> Void
@@ -215,7 +252,7 @@ struct BucketRowCard: View {
                 HStack(spacing: 8) {
                     Image(systemName: "tray.full.fill")
                         .foregroundStyle(isSelected ? AnyShapeStyle(theme.gradient) : AnyShapeStyle(.secondary))
-                    Text(bucket.name)
+                    Text(displayName ?? bucket.name)
                         .font(.callout.weight(.semibold))
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -257,6 +294,66 @@ struct BucketRowCard: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .animation(.easeOut(duration: 0.12), value: hovering)
+    }
+}
+
+// MARK: - Alias sheet
+
+struct AliasSheet: View {
+    let accountID: UUID
+    let bucket: String
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.appTheme) private var theme
+    @State private var alias: String
+
+    init(accountID: UUID, bucket: String) {
+        self.accountID = accountID
+        self.bucket = bucket
+        _alias = State(
+            initialValue: BucketAliases.shared.alias(accountID: accountID, bucket: bucket) ?? ""
+        )
+    }
+
+    var body: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "tag.fill")
+                .font(.system(size: 26))
+                .foregroundStyle(theme.gradient)
+            Text("Bucket Alias")
+                .font(.title3.weight(.semibold))
+            Text("Shown instead of “\(bucket)” across Buckett.\nUploads and API requests still use the real bucket name.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            TextField("Alias (e.g. Backups)", text: $alias)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 260)
+            HStack {
+                Button("Cancel") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Spacer()
+                if BucketAliases.shared.alias(accountID: accountID, bucket: bucket) != nil {
+                    Button("Remove", role: .destructive) {
+                        BucketAliases.shared.setAlias(nil, accountID: accountID, bucket: bucket)
+                        dismiss()
+                    }
+                }
+                Button("Save") {
+                    BucketAliases.shared.setAlias(alias, accountID: accountID, bucket: bucket)
+                    dismiss()
+                    ToastCenter.shared.show(
+                        "Alias saved",
+                        detail: alias.trimmingCharacters(in: .whitespaces).isEmpty
+                            ? nil : "\(bucket) → \(alias)"
+                    )
+                }
+                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
+            }
+            .frame(width: 260)
+        }
+        .padding(22)
     }
 }
 

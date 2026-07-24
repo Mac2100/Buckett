@@ -3,6 +3,7 @@ import Charts
 
 struct DashboardView: View {
     @EnvironmentObject private var appState: AppState
+    @ObservedObject private var aliasStore = BucketAliases.shared
 
     private var analyzedStats: [BucketStats] {
         appState.buckets.compactMap { appState.stats[$0.name] }
@@ -23,6 +24,9 @@ struct DashboardView: View {
                     ForEach(appState.buckets) { bucket in
                         BucketCard(
                             bucket: bucket,
+                            displayName: appState.selectedAccountID.map {
+                                aliasStore.displayName(accountID: $0, bucket: bucket.name)
+                            } ?? bucket.name,
                             stats: appState.stats[bucket.name],
                             analyzing: appState.analyzing.contains(bucket.name)
                         ) {
@@ -98,6 +102,7 @@ struct StatTile: View {
 
 struct BucketCard: View {
     let bucket: Bucket
+    var displayName: String? = nil
     let stats: BucketStats?
     let analyzing: Bool
     let onAnalyze: () -> Void
@@ -106,7 +111,7 @@ struct BucketCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Label(bucket.name, systemImage: "tray.full")
+                Label(displayName ?? bucket.name, systemImage: "tray.full")
                     .font(.headline)
                     .lineLimit(1)
                 Spacer()

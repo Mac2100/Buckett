@@ -47,10 +47,16 @@ enum BucketTab: String, CaseIterable {
 
 struct BucketDetailView: View {
     @EnvironmentObject private var appState: AppState
+    @ObservedObject private var aliasStore = BucketAliases.shared
     let bucket: String
     let client: S3Client
 
     @State private var tab: BucketTab = .files
+
+    private var title: String {
+        guard let accountID = appState.selectedAccountID else { return bucket }
+        return aliasStore.displayName(accountID: accountID, bucket: bucket)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -79,7 +85,7 @@ struct BucketDetailView: View {
                 StatisticsView(bucket: bucket)
             }
         }
-        .navigationTitle(bucket)
+        .navigationTitle(title)
     }
 }
 
