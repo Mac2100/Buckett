@@ -1,100 +1,37 @@
 import SwiftUI
 
+/// A bucket qualified by the account it lives in (sidebar sheets need both).
+struct AccountBucket: Identifiable {
+    let account: Account
+    let bucket: Bucket
+    var id: String { account.id.uuidString + "|" + bucket.name }
+}
+
 struct SidebarView: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.appTheme) private var theme
     @ObservedObject private var aliasStore = BucketAliases.shared
     @State private var showNewBucket = false
-    @State private var aliasTarget: Bucket?
-    @State private var deleteTarget: Bucket?
+    @State private var aliasTarget: AccountBucket?
+    @State private var deleteTarget: AccountBucket?
 
     var body: some View {
         VStack(spacing: 0) {
             header
-            accountSwitcher
-                .padding(.horizontal, 12)
-                .padding(.top, 4)
 
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 6) {
                     overviewRow
-                        .padding(.top, 12)
+                        .padding(.top, 6)
 
-                    HStack {
-                        Text("BUCKETS")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        if appState.bucketsLoading {
-                            ProgressView().controlSize(.mini)
-                        }
-                        Button {
-                            Task { await appState.loadBuckets() }
-                        } label: {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.system(size: 10, weight: .semibold))
-                        }
-                        .buttonStyle(.borderless)
-                        .help("Refresh buckets")
-                        Button {
-                            showNewBucket = true
-                        } label: {
-                            Image(systemName: "plus")
-                                .font(.system(size: 11, weight: .semibold))
-                        }
-                        .buttonStyle(.borderless)
-                        .help("New bucket")
-                        .disabled(appState.currentClient == nil)
-                    }
-                    .padding(.top, 12)
-                    .padding(.horizontal, 4)
-
-                    ForEach(appState.buckets) { bucket in
-                        BucketRowCard(
-                            bucket: bucket,
-                            displayName: displayName(for: bucket),
-                            stats: appState.stats[bucket.name],
-                            isSelected: appState.sidebarSelection == .bucket(bucket.name)
-                        ) {
-                            appState.sidebarSelection = .bucket(bucket.name)
-                        }
-                        .contextMenu {
-                            Button(
-                                aliasFor(bucket) == nil ? "Set Alias…" : "Edit Alias…"
-                            ) {
-                                aliasTarget = bucket
-                            }
-                            if aliasFor(bucket) != nil {
-                                Button("Remove Alias") {
-                                    if let accountID = appState.selectedAccountID {
-                                        aliasStore.setAlias(
-                                            nil, accountID: accountID, bucket: bucket.name
-                                        )
-                                    }
-                                }
-                            }
-                            Divider()
-                            Button("Delete Bucket…", role: .destructive) {
-                                deleteTarget = bucket
-                            }
-                        }
-                        .help(
-                            aliasFor(bucket) == nil ? bucket.name : "Bucket: \(bucket.name)"
-                        )
+                    ForEach(appState.accountStore.accounts) { account in
+                        accountSection(account)
                     }
 
                     if let error = appState.bucketsError {
                         Text(error)
                             .font(.caption)
                             .foregroundStyle(.red)
-                            .padding(6)
-                    }
-
-                    if appState.buckets.isEmpty && !appState.bucketsLoading
-                        && appState.bucketsError == nil && appState.selectedAccount != nil {
-                        Text("No buckets yet. Create one with +")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
                             .padding(6)
                     }
                 }
@@ -107,23 +44,12 @@ struct SidebarView: View {
         .sheet(isPresented: $showNewBucket) {
             NewBucketSheet()
         }
-        .sheet(item: $aliasTarget) { bucket in
-            if let accountID = appState.selectedAccountID {
-                AliasSheet(accountID: accountID, bucket: bucket.name)
-            }
+        .sheet(item: $aliasTarget) { target in
+            AliasSheet(accountID: target.account.id, bucket: target.bucket.name)
         }
-        .sheet(item: $deleteTarget) { bucket in
-            DeleteBucketSheet(bucket: bucket)
+        .sheet(item: $deleteTarget) { target in
+            DeleteBucketSheet(account: target.account, bucket: target.bucket)
         }
-    }
-
-    private func aliasFor(_ bucket: Bucket) -> String? {
-        guard let accountID = appState.selectedAccountID else { return nil }
-        return aliasStore.alias(accountID: accountID, bucket: bucket.name)
-    }
-
-    private func displayName(for bucket: Bucket) -> String {
-        aliasFor(bucket) ?? bucket.name
     }
 
     private var header: some View {
@@ -132,71 +58,17 @@ struct SidebarView: View {
             Text("Buckett")
                 .font(.title3.weight(.bold))
             Spacer()
+            Button {
+                Task { await appState.loadBuckets() }
+            } label: {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 11, weight: .semibold))
+            }
+            .buttonStyle(.borderless)
+            .help("Refresh all accounts")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-    }
-
-    @ViewBuilder
-    private var accountSwitcher: some View {
-        if appState.accountStore.accounts.isEmpty {
-            Button {
-                appState.showOnboarding = true
-            } label: {
-                Label("Add Account…", systemImage: "person.crop.circle.badge.plus")
-                    .frame(maxWidth: .infinity)
-            }
-            .controlSize(.large)
-        } else {
-            Menu {
-                ForEach(appState.accountStore.accounts) { account in
-                    Button {
-                        appState.selectAccount(account.id)
-                    } label: {
-                        HStack {
-                            Image(systemName: account.provider.symbolName)
-                            Text(account.name.isEmpty ? account.provider.displayName : account.name)
-                            if account.id == appState.selectedAccountID {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                }
-                Divider()
-                Button("Add Account…") {
-                    appState.showOnboarding = true
-                }
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: appState.selectedAccount?.provider.symbolName ?? "cloud")
-                        .foregroundStyle(theme.gradient)
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text(currentAccountName)
-                            .font(.callout.weight(.medium))
-                            .lineLimit(1)
-                        if let account = appState.selectedAccount {
-                            Text(account.provider.displayName)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
-                .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-                .contentShape(RoundedRectangle(cornerRadius: 9))
-            }
-            .menuStyle(.borderlessButton)
-        }
-    }
-
-    private var currentAccountName: String {
-        guard let account = appState.selectedAccount else { return "Select account" }
-        return account.name.isEmpty ? account.provider.displayName : account.name
     }
 
     private var overviewRow: some View {
@@ -225,6 +97,83 @@ struct SidebarView: View {
         .buttonStyle(.plain)
     }
 
+    // MARK: - Account sections (all accounts, all buckets)
+
+    @ViewBuilder
+    private func accountSection(_ account: Account) -> some View {
+        let buckets = appState.bucketList(for: account.id)
+        let isSelectedAccount = account.id == appState.selectedAccountID
+
+        HStack(spacing: 6) {
+            Image(systemName: account.provider.symbolName)
+                .font(.system(size: 10))
+                .foregroundStyle(isSelectedAccount ? AnyShapeStyle(theme.gradient) : AnyShapeStyle(.secondary))
+            Text((account.name.isEmpty ? account.provider.displayName : account.name).uppercased())
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            Spacer()
+            if isSelectedAccount && appState.bucketsLoading {
+                ProgressView().controlSize(.mini)
+            }
+            Button {
+                appState.selectAccount(account.id)
+                showNewBucket = true
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 10, weight: .semibold))
+            }
+            .buttonStyle(.borderless)
+            .help("New bucket in this account")
+        }
+        .padding(.top, 12)
+        .padding(.horizontal, 4)
+
+        if buckets.isEmpty {
+            Text(isSelectedAccount && appState.bucketsLoading ? "Loading…" : "No buckets")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+        }
+
+        ForEach(buckets) { bucket in
+            BucketRowCard(
+                bucket: bucket,
+                displayName: aliasStore.displayName(accountID: account.id, bucket: bucket.name),
+                stats: isSelectedAccount ? appState.stats[bucket.name] : nil,
+                isSelected: isSelectedAccount && appState.sidebarSelection == .bucket(bucket.name)
+            ) {
+                select(account: account, bucket: bucket.name)
+            }
+            .contextMenu {
+                Button(
+                    aliasStore.alias(accountID: account.id, bucket: bucket.name) == nil
+                        ? "Set Alias…" : "Edit Alias…"
+                ) {
+                    aliasTarget = AccountBucket(account: account, bucket: bucket)
+                }
+                if aliasStore.alias(accountID: account.id, bucket: bucket.name) != nil {
+                    Button("Remove Alias") {
+                        aliasStore.setAlias(nil, accountID: account.id, bucket: bucket.name)
+                    }
+                }
+                Divider()
+                Button("Delete Bucket…", role: .destructive) {
+                    deleteTarget = AccountBucket(account: account, bucket: bucket)
+                }
+            }
+            .help("Bucket: \(bucket.name)")
+        }
+    }
+
+    private func select(account: Account, bucket: String) {
+        if appState.selectedAccountID != account.id {
+            appState.selectAccount(account.id)
+        }
+        appState.sidebarSelection = .bucket(bucket)
+    }
+
     private var footer: some View {
         HStack {
             SettingsLink {
@@ -232,6 +181,13 @@ struct SidebarView: View {
                     .font(.callout)
             }
             .buttonStyle(.borderless)
+            Button {
+                appState.showOnboarding = true
+            } label: {
+                Image(systemName: "person.crop.circle.badge.plus")
+            }
+            .buttonStyle(.borderless)
+            .help("Add account")
             Spacer()
             Text("v\(AppVersion.current)")
                 .font(.caption2)
@@ -363,8 +319,11 @@ struct AliasSheet: View {
 // MARK: - Delete bucket sheet
 
 /// Type-to-confirm destructive flow: the bucket name must be typed exactly,
-/// and emptying a non-empty bucket is an explicit opt-in.
+/// and emptying a non-empty bucket is an explicit opt-in. Emptying purges all
+/// object versions and unfinished uploads (the hidden content that makes
+/// "empty-looking" buckets undeletable on B2).
 struct DeleteBucketSheet: View {
+    let account: Account
     let bucket: Bucket
 
     @EnvironmentObject private var appState: AppState
@@ -375,7 +334,7 @@ struct DeleteBucketSheet: View {
     @State private var errorMessage: String?
 
     private var stats: BucketStats? {
-        appState.stats[bucket.name]
+        account.id == appState.selectedAccountID ? appState.stats[bucket.name] : nil
     }
 
     private var confirmed: Bool {
@@ -391,7 +350,7 @@ struct DeleteBucketSheet: View {
                 .font(.title3.weight(.semibold))
 
             VStack(spacing: 6) {
-                Text("This permanently deletes “\(bucket.name)” from \(appState.selectedAccount?.provider.displayName ?? "your provider").")
+                Text("This permanently deletes “\(bucket.name)” from \(account.provider.displayName).")
                     .multilineTextAlignment(.center)
                 if let stats, stats.objectCount > 0 {
                     Text("It currently contains \(stats.objectCount) object\(stats.objectCount == 1 ? "" : "s") (\(stats.formattedSize)).")
@@ -407,7 +366,7 @@ struct DeleteBucketSheet: View {
             Toggle(isOn: $emptyFirst) {
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Also delete all objects inside")
-                    Text("Required for non-empty buckets — the provider only deletes empty buckets.")
+                    Text("Purges every object, hidden file version, and unfinished upload. Required unless the bucket is truly empty.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -463,13 +422,14 @@ struct DeleteBucketSheet: View {
         errorMessage = nil
         let name = bucket.name
         let empty = emptyFirst
+        let target = account
         Task {
             do {
-                try await appState.deleteBucket(named: name, emptyFirst: empty)
+                try await appState.deleteBucket(named: name, in: target, emptyFirst: empty)
                 dismiss()
                 ToastCenter.shared.show("Bucket deleted", detail: name)
             } catch let error as S3Error where error.code == "BucketNotEmpty" {
-                errorMessage = "The bucket isn't empty. Enable “Also delete all objects inside” to empty it first."
+                errorMessage = "The bucket still contains hidden file versions or unfinished uploads. Enable “Also delete all objects inside” to purge them first."
             } catch {
                 errorMessage = error.localizedDescription
             }
@@ -505,6 +465,11 @@ struct NewBucketSheet: View {
                 .foregroundStyle(theme.gradient)
             Text("New Bucket")
                 .font(.title3.weight(.semibold))
+            if let account = appState.selectedAccount {
+                Text("In \(account.name.isEmpty ? account.provider.displayName : account.name)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
 
             VStack(alignment: .leading, spacing: 6) {
                 TextField("bucket-name", text: $name)

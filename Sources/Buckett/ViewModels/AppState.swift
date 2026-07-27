@@ -168,17 +168,25 @@ final class AppState: ObservableObject {
         await loadBuckets()
     }
 
-    /// Deletes a bucket in the selected account, optionally emptying it first
-    /// (S3 only deletes empty buckets). Cleans up aliases, stats, and menu bar
-    /// drop-target references to the bucket.
-    func deleteBucket(named name: String, emptyFirst: Bool) async throws {
-        guard let account = selectedAccount, let client = client(for: account) else {
-            throw S3Error(status: 0, code: "NoAccount", message: "No account selected")
+    /// Deletes a bucket, optionally emptying it first. Emptying purges ALL
+    /// object versions and delete markers (Backblaze B2 keeps hidden versions
+    /// that make a bucket look empty while still blocking deletion) and aborts
+    /// unfinished multipart uploads. Cleans up aliases, stats, and menu bar
+    /// drop-target references afterwards.
+    func deleteBucket(named name: String, in account: Account, emptyFirst: Bool) async throws {
+        guard let client = client(for: account) else {
+            throw S3Error(status: 0, code: "NoCredentials", message: "Missing account credentials")
         }
         if emptyFirst {
-            let objects = try await client.listAllObjects(bucket: name)
-            if !objects.isEmpty {
-                try await client.deleteObjects(bucket: name, keys: objects.map(\.key))
+            let versions = try await client.listAllObjectVersions(bucket: name)
+            if !versions.isEmpty {
+                try await client.deleteObjectVersions(bucket: name, versions: versions)
+            }
+            let uploads = (try? await client.listMultipartUploads(bucket: name)) ?? []
+            for upload in uploads {
+                try? await client.abortMultipartUpload(
+                    bucket: name, key: upload.key, uploadID: upload.uploadID
+                )
             }
         }
         try await client.deleteBucket(name)
@@ -191,10 +199,13 @@ final class AppState: ObservableObject {
             shortlist.removeAll { $0 == encoded }
             UserDefaults.standard.set(shortlist, forKey: MenuBarController.dropBucketsKey)
         }
-        if sidebarSelection == .bucket(name) {
-            sidebarSelection = .dashboard
+        accountBuckets[account.id]?.removeAll { $0.name == name }
+        if account.id == selectedAccountID {
+            if sidebarSelection == .bucket(name) {
+                sidebarSelection = .dashboard
+            }
+            await loadBuckets()
         }
-        await loadBuckets()
     }
 
     // MARK: - Main window
