@@ -168,6 +168,35 @@ final class AppState: ObservableObject {
         await loadBuckets()
     }
 
+    /// Deletes a bucket in the selected account, optionally emptying it first
+    /// (S3 only deletes empty buckets). Cleans up aliases, stats, and menu bar
+    /// drop-target references to the bucket.
+    func deleteBucket(named name: String, emptyFirst: Bool) async throws {
+        guard let account = selectedAccount, let client = client(for: account) else {
+            throw S3Error(status: 0, code: "NoAccount", message: "No account selected")
+        }
+        if emptyFirst {
+            let objects = try await client.listAllObjects(bucket: name)
+            if !objects.isEmpty {
+                try await client.deleteObjects(bucket: name, keys: objects.map(\.key))
+            }
+        }
+        try await client.deleteBucket(name)
+
+        stats.removeValue(forKey: name)
+        BucketAliases.shared.setAlias(nil, accountID: account.id, bucket: name)
+        let encoded = MenuDropTarget(accountID: account.id, bucket: name).encoded
+        var shortlist = MenuBarController.dropShortlist()
+        if shortlist.contains(encoded) {
+            shortlist.removeAll { $0 == encoded }
+            UserDefaults.standard.set(shortlist, forKey: MenuBarController.dropBucketsKey)
+        }
+        if sidebarSelection == .bucket(name) {
+            sidebarSelection = .dashboard
+        }
+        await loadBuckets()
+    }
+
     // MARK: - Main window
 
     /// Captured from the SwiftUI environment so AppKit contexts (Dock reopen,
