@@ -248,7 +248,7 @@ struct SidebarView: View {
             BucketRowCard(
                 bucket: bucket,
                 displayName: aliasStore.displayName(accountID: account.id, bucket: bucket.name),
-                stats: isSelectedAccount ? appState.stats[bucket.name] : nil,
+                stats: appState.stats(accountID: account.id, bucket: bucket.name),
                 isSelected: isSelectedAccount && appState.sidebarSelection == .bucket(bucket.name)
             ) {
                 select(account: account, bucket: bucket.name)
@@ -434,7 +434,7 @@ struct DeleteBucketSheet: View {
     @State private var errorMessage: String?
 
     private var stats: BucketStats? {
-        account.id == appState.selectedAccountID ? appState.stats[bucket.name] : nil
+        appState.stats(accountID: account.id, bucket: bucket.name)
     }
 
     private var confirmed: Bool {

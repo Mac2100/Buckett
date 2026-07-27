@@ -4,9 +4,25 @@ import Charts
 struct DashboardView: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject private var aliasStore = BucketAliases.shared
+    @AppStorage("sidebarShowAllAccounts") private var showAllAccounts = false
+
+    private var overviewAccounts: [Account] {
+        if showAllAccounts {
+            return appState.accountStore.accounts
+        }
+        return appState.selectedAccount.map { [$0] } ?? []
+    }
 
     private var analyzedStats: [BucketStats] {
-        appState.buckets.compactMap { appState.stats[$0.name] }
+        overviewAccounts.flatMap { account in
+            appState.bucketList(for: account.id).compactMap {
+                appState.stats(accountID: account.id, bucket: $0.name)
+            }
+        }
+    }
+
+    private var totalBucketCount: Int {
+        overviewAccounts.reduce(0) { $0 + appState.bucketList(for: $1.id).count }
     }
 
     var body: some View {
@@ -16,28 +32,13 @@ struct DashboardView: View {
                 if !analyzedStats.isEmpty {
                     summaryRow
                 }
-                LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: 340, maximum: 520), spacing: 16)],
-                    alignment: .leading,
-                    spacing: 16
-                ) {
-                    ForEach(appState.buckets) { bucket in
-                        BucketCard(
-                            bucket: bucket,
-                            displayName: appState.selectedAccountID.map {
-                                aliasStore.displayName(accountID: $0, bucket: bucket.name)
-                            } ?? bucket.name,
-                            stats: appState.stats[bucket.name],
-                            analyzing: appState.analyzing.contains(bucket.name)
-                        ) {
-                            appState.analyze(bucket: bucket.name)
-                        } onOpen: {
-                            appState.sidebarSelection = .bucket(bucket.name)
-                        }
-                    }
+
+                ForEach(overviewAccounts) { account in
+                    accountSection(account)
                 }
-                if appState.buckets.isEmpty && !appState.bucketsLoading {
-                    Text("No buckets found for this account.")
+
+                if totalBucketCount == 0 && !appState.bucketsLoading {
+                    Text("No buckets found.")
                         .foregroundStyle(.secondary)
                 }
             }
@@ -48,10 +49,13 @@ struct DashboardView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(appState.selectedAccount?.name ?? "Dashboard")
+            Text(showAllAccounts ? "All Accounts" : (appState.selectedAccount?.name ?? "Dashboard"))
                 .font(.largeTitle.weight(.semibold))
-            if let account = appState.selectedAccount {
-                Text("\(account.provider.displayName) · \(appState.buckets.count) bucket\(appState.buckets.count == 1 ? "" : "s")")
+            if showAllAccounts {
+                Text("\(overviewAccounts.count) account\(overviewAccounts.count == 1 ? "" : "s") · \(totalBucketCount) bucket\(totalBucketCount == 1 ? "" : "s")")
+                    .foregroundStyle(.secondary)
+            } else if let account = appState.selectedAccount {
+                Text("\(account.provider.displayName) · \(totalBucketCount) bucket\(totalBucketCount == 1 ? "" : "s")")
                     .foregroundStyle(.secondary)
             }
         }
@@ -71,9 +75,58 @@ struct DashboardView: View {
             )
             StatTile(
                 title: "Buckets Analyzed",
-                value: "\(analyzedStats.count) of \(appState.buckets.count)",
+                value: "\(analyzedStats.count) of \(totalBucketCount)",
                 symbol: "tray.2.fill"
             )
+        }
+    }
+
+    @ViewBuilder
+    private func accountSection(_ account: Account) -> some View {
+        let buckets = appState.bucketList(for: account.id)
+
+        if showAllAccounts {
+            HStack(spacing: 7) {
+                Image(systemName: account.provider.symbolName)
+                    .foregroundStyle(.secondary)
+                Text(account.name.isEmpty ? account.provider.displayName : account.name)
+                    .font(.title3.weight(.semibold))
+                Text("· \(account.provider.displayName)")
+                    .font(.callout)
+                    .foregroundStyle(.tertiary)
+                Spacer()
+            }
+            .padding(.top, 6)
+        }
+
+        if buckets.isEmpty {
+            Text("No buckets in this account.")
+                .font(.callout)
+                .foregroundStyle(.tertiary)
+        } else {
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 340, maximum: 520), spacing: 16)],
+                alignment: .leading,
+                spacing: 16
+            ) {
+                ForEach(buckets) { bucket in
+                    BucketCard(
+                        bucket: bucket,
+                        displayName: aliasStore.displayName(
+                            accountID: account.id, bucket: bucket.name
+                        ),
+                        stats: appState.stats(accountID: account.id, bucket: bucket.name),
+                        analyzing: appState.isAnalyzing(accountID: account.id, bucket: bucket.name)
+                    ) {
+                        appState.analyze(account: account, bucket: bucket.name)
+                    } onOpen: {
+                        if appState.selectedAccountID != account.id {
+                            appState.selectAccount(account.id)
+                        }
+                        appState.sidebarSelection = .bucket(bucket.name)
+                    }
+                }
+            }
         }
     }
 }
