@@ -381,10 +381,17 @@ final class S3Client {
     }
 
     func copyObject(bucket: String, fromKey: String, toKey: String) async throws {
-        let source = "/" + SigV4.encode(bucket) + "/" + SigV4.encode(fromKey, keepSlash: true)
+        try await copyObject(fromBucket: bucket, fromKey: fromKey, toBucket: bucket, toKey: toKey)
+    }
+
+    /// Server-side copy, including across buckets in the same account.
+    func copyObject(
+        fromBucket: String, fromKey: String, toBucket: String, toKey: String
+    ) async throws {
+        let source = "/" + SigV4.encode(fromBucket) + "/" + SigV4.encode(fromKey, keepSlash: true)
         let request = try buildRequest(
             method: "PUT",
-            bucket: bucket,
+            bucket: toBucket,
             key: toKey,
             headers: ["x-amz-copy-source": source]
         )
@@ -397,6 +404,154 @@ final class S3Client {
                 message: root["Message"]?.trimmedText
             )
         }
+    }
+
+    /// Uploads a local file, using multipart for large files (no resume record —
+    /// used for cross-account relays; interactive uploads go through TransferManager).
+    func uploadFile(
+        bucket: String, key: String, fileURL: URL, contentType: String? = nil
+    ) async throws {
+        let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+        let fileSize = (attributes[.size] as? Int64) ?? 0
+
+        guard fileSize >= Self.multipartThreshold else {
+            let data = try Data(contentsOf: fileURL)
+            try await putObject(bucket: bucket, key: key, data: data, contentType: contentType)
+            return
+        }
+
+        let uploadID = try await createMultipartUpload(
+            bucket: bucket, key: key, contentType: contentType
+        )
+        do {
+            let handle = try FileHandle(forReadingFrom: fileURL)
+            defer { try? handle.close() }
+            let partSize = Self.multipartPartSize
+            let partCount = Int((fileSize + partSize - 1) / partSize)
+            var parts: [(partNumber: Int, eTag: String)] = []
+            for part in 1...partCount {
+                try Task.checkCancellation()
+                let offset = Int64(part - 1) * partSize
+                let length = Int(min(partSize, fileSize - offset))
+                try handle.seek(toOffset: UInt64(offset))
+                guard let data = try handle.read(upToCount: length), data.count == length else {
+                    throw S3Error(status: 0, code: "ReadError", message: "Could not read part \(part)")
+                }
+                let etag = try await uploadPart(
+                    bucket: bucket, key: key, uploadID: uploadID, partNumber: part, data: data
+                )
+                parts.append((part, etag))
+            }
+            try await completeMultipartUpload(
+                bucket: bucket, key: key, uploadID: uploadID, parts: parts
+            )
+        } catch {
+            try? await abortMultipartUpload(bucket: bucket, key: key, uploadID: uploadID)
+            throw error
+        }
+    }
+
+    // MARK: - Object versions & multipart housekeeping (bucket emptying)
+
+    struct ObjectVersion {
+        let key: String
+        let versionID: String?
+    }
+
+    /// Every object version and delete marker in the bucket — what actually has
+    /// to go before a versioning provider (e.g. Backblaze B2) will delete it.
+    func listAllObjectVersions(bucket: String) async throws -> [ObjectVersion] {
+        var all: [ObjectVersion] = []
+        var keyMarker: String?
+        var versionMarker: String?
+        var more = true
+        while more {
+            try Task.checkCancellation()
+            var query: [(String, String?)] = [("versions", nil), ("max-keys", "1000")]
+            if let keyMarker { query.append(("key-marker", keyMarker)) }
+            if let versionMarker { query.append(("version-id-marker", versionMarker)) }
+            let request = try buildRequest(method: "GET", bucket: bucket, query: query)
+            let (data, _) = try await send(request)
+            guard let root = XMLTree.parse(data) else { break }
+            for node in root.all("Version") + root.all("DeleteMarker") {
+                guard let key = node["Key"]?.trimmedText, !key.isEmpty else { continue }
+                let versionID = node["VersionId"]?.trimmedText
+                all.append(ObjectVersion(
+                    key: key,
+                    versionID: (versionID?.isEmpty == false && versionID != "null") ? versionID : nil
+                ))
+            }
+            let truncated = root["IsTruncated"]?.trimmedText == "true"
+            keyMarker = root["NextKeyMarker"]?.trimmedText
+            versionMarker = root["NextVersionIdMarker"]?.trimmedText
+            more = truncated && (keyMarker != nil || versionMarker != nil)
+        }
+        return all
+    }
+
+    /// Batch-deletes specific object versions (chunked at the S3 limit of 1000).
+    func deleteObjectVersions(bucket: String, versions: [ObjectVersion]) async throws {
+        var remaining = versions
+        while !remaining.isEmpty {
+            let chunk = Array(remaining.prefix(1000))
+            remaining.removeFirst(chunk.count)
+
+            let objectsXML = chunk.map { version -> String in
+                var xml = "<Object><Key>\(xmlEscape(version.key))</Key>"
+                if let id = version.versionID {
+                    xml += "<VersionId>\(xmlEscape(id))</VersionId>"
+                }
+                return xml + "</Object>"
+            }.joined()
+            let body = Data("<Delete><Quiet>true</Quiet>\(objectsXML)</Delete>".utf8)
+            let md5 = Data(Insecure.MD5.hash(data: body)).base64EncodedString()
+
+            let request = try buildRequest(
+                method: "POST",
+                bucket: bucket,
+                query: [("delete", nil)],
+                headers: ["Content-MD5": md5, "Content-Type": "application/xml"],
+                body: body
+            )
+            let (data, _) = try await send(request)
+            if let root = XMLTree.parse(data), root.name == "DeleteResult",
+               let error = root.all("Error").first {
+                throw S3Error(
+                    status: 200,
+                    code: error["Code"]?.trimmedText,
+                    message: error["Message"]?.trimmedText
+                )
+            }
+        }
+    }
+
+    /// In-progress multipart uploads — invisible in normal listings but they
+    /// block bucket deletion until aborted.
+    func listMultipartUploads(bucket: String) async throws -> [(key: String, uploadID: String)] {
+        var all: [(String, String)] = []
+        var keyMarker: String?
+        var uploadMarker: String?
+        var more = true
+        while more {
+            try Task.checkCancellation()
+            var query: [(String, String?)] = [("uploads", nil), ("max-uploads", "1000")]
+            if let keyMarker { query.append(("key-marker", keyMarker)) }
+            if let uploadMarker { query.append(("upload-id-marker", uploadMarker)) }
+            let request = try buildRequest(method: "GET", bucket: bucket, query: query)
+            let (data, _) = try await send(request)
+            guard let root = XMLTree.parse(data) else { break }
+            for node in root.all("Upload") {
+                guard let key = node["Key"]?.trimmedText,
+                      let uploadID = node["UploadId"]?.trimmedText,
+                      !key.isEmpty, !uploadID.isEmpty else { continue }
+                all.append((key, uploadID))
+            }
+            let truncated = root["IsTruncated"]?.trimmedText == "true"
+            keyMarker = root["NextKeyMarker"]?.trimmedText
+            uploadMarker = root["NextUploadIdMarker"]?.trimmedText
+            more = truncated && (keyMarker != nil || uploadMarker != nil)
+        }
+        return all
     }
 
     func headObject(bucket: String, key: String) async throws -> ObjectMetadata {

@@ -308,18 +308,32 @@ final class BrowserModel: ObservableObject {
         }
     }
 
-    /// Moves the selected files (folders are skipped) into `targetPrefix`.
-    func move(objects: [RemoteObject], toPrefix targetPrefix: String, strategy: ConflictStrategy) async {
+    /// Moves the selected files (folders are skipped) to any destination —
+    /// same bucket, another bucket in the same account (server-side copy), or
+    /// a bucket in a different account/provider (relayed through this Mac:
+    /// download from the source, upload to the destination).
+    func move(
+        objects: [RemoteObject],
+        destClient: S3Client,
+        destBucket: String,
+        toPrefix targetPrefix: String,
+        strategy: ConflictStrategy,
+        destDisplayName: String? = nil
+    ) async {
         isBusy = true
         defer { isBusy = false }
+        let sameAccount = destClient === client
         var moved = 0
         var skipped = 0
         do {
             for object in objects where !object.isFolder {
                 var destKey = targetPrefix + object.name
-                if destKey == object.key { skipped += 1; continue }
+                if sameAccount, destBucket == bucket, destKey == object.key {
+                    skipped += 1
+                    continue
+                }
 
-                if try await client.objectExists(bucket: bucket, key: destKey) {
+                if try await destClient.objectExists(bucket: destBucket, key: destKey) {
                     switch strategy {
                     case .skip:
                         skipped += 1
@@ -336,18 +350,41 @@ final class BrowserModel: ObservableObject {
                                 : "\(base)-\(attempt).\(ext)"
                             destKey = targetPrefix + candidate
                             attempt += 1
-                        } while try await client.objectExists(bucket: bucket, key: destKey)
+                        } while try await destClient.objectExists(bucket: destBucket, key: destKey)
                     }
                 }
 
-                try await client.copyObject(bucket: bucket, fromKey: object.key, toKey: destKey)
+                if sameAccount {
+                    try await client.copyObject(
+                        fromBucket: bucket, fromKey: object.key,
+                        toBucket: destBucket, toKey: destKey
+                    )
+                } else {
+                    let temp = FileManager.default.temporaryDirectory
+                        .appendingPathComponent("buckett-relay-\(UUID().uuidString)")
+                    try await client.downloadObject(bucket: bucket, key: object.key, to: temp)
+                    do {
+                        try await destClient.uploadFile(
+                            bucket: destBucket,
+                            key: destKey,
+                            fileURL: temp,
+                            contentType: object.contentType?.preferredMIMEType
+                        )
+                    } catch {
+                        try? FileManager.default.removeItem(at: temp)
+                        throw error
+                    }
+                    try? FileManager.default.removeItem(at: temp)
+                }
                 try await client.deleteObject(bucket: bucket, key: object.key)
                 moved += 1
             }
             selection.removeAll()
             await load()
-            var detail: String? = nil
-            if skipped > 0 { detail = "\(skipped) skipped" }
+            var detail = destDisplayName.map { "→ \($0)" }
+            if skipped > 0 {
+                detail = [detail, "\(skipped) skipped"].compactMap { $0 }.joined(separator: " · ")
+            }
             ToastCenter.shared.show("Moved \(moved) file\(moved == 1 ? "" : "s")", detail: detail)
         } catch {
             errorMessage = error.localizedDescription
