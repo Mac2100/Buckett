@@ -10,11 +10,15 @@ struct StatisticsView: View {
     let bucket: String
 
     private var stats: BucketStats? {
-        appState.stats[bucket]
+        appState.selectedAccountID.flatMap {
+            appState.stats(accountID: $0, bucket: bucket)
+        }
     }
 
     private var analyzing: Bool {
-        appState.analyzing.contains(bucket)
+        appState.selectedAccountID.map {
+            appState.isAnalyzing(accountID: $0, bucket: bucket)
+        } ?? false
     }
 
     var body: some View {

@@ -29,8 +29,22 @@ final class AppState: ObservableObject {
     /// Bucket lists for every account (not just the selected one), so the
     /// menu bar drop menu can offer buckets across accounts.
     @Published var accountBuckets: [UUID: [Bucket]] = [:]
+    /// Bucket analytics keyed by "accountUUID|bucket" so every account's
+    /// buckets can carry stats simultaneously.
     @Published var stats: [String: BucketStats] = [:]
     @Published var analyzing: Set<String> = []
+
+    static func statsKey(_ accountID: UUID, _ bucket: String) -> String {
+        accountID.uuidString + "|" + bucket
+    }
+
+    func stats(accountID: UUID, bucket: String) -> BucketStats? {
+        stats[Self.statsKey(accountID, bucket)]
+    }
+
+    func isAnalyzing(accountID: UUID, bucket: String) -> Bool {
+        analyzing.contains(Self.statsKey(accountID, bucket))
+    }
 
     private var clientCache: [UUID: S3Client] = [:]
     private var cancellables: Set<AnyCancellable> = []
@@ -139,14 +153,15 @@ final class AppState: ObservableObject {
     }
 
     /// Background-refreshes bucket lists for accounts other than the selected
-    /// one, feeding the cross-account menu bar drop menu.
+    /// one (menu bar drop menu, All Accounts sidebar/overview), then kicks off
+    /// their stale-stats analysis.
     private func loadOtherAccountBuckets() {
         for account in accountStore.accounts where account.id != selectedAccountID {
             guard let client = client(for: account) else { continue }
-            let accountID = account.id
             Task { [weak self] in
                 guard let list = try? await client.listBuckets() else { return }
-                self?.accountBuckets[accountID] = list
+                self?.accountBuckets[account.id] = list
+                self?.autoAnalyze(account: account)
             }
         }
     }
@@ -191,7 +206,7 @@ final class AppState: ObservableObject {
         }
         try await client.deleteBucket(name)
 
-        stats.removeValue(forKey: name)
+        stats.removeValue(forKey: Self.statsKey(account.id, name))
         BucketAliases.shared.setAlias(nil, accountID: account.id, bucket: name)
         let encoded = MenuDropTarget(accountID: account.id, bucket: name).encoded
         var shortlist = MenuBarController.dropShortlist()
@@ -291,41 +306,66 @@ final class AppState: ObservableObject {
 
     // MARK: - Analytics
 
+    /// Convenience for the selected account.
     func analyze(bucket: String) {
-        Task { await analyzeNow(bucket: bucket) }
+        guard let account = selectedAccount else { return }
+        analyze(account: account, bucket: bucket)
     }
 
-    func analyzeNow(bucket: String) async {
-        guard let client = currentClient, !analyzing.contains(bucket) else { return }
-        analyzing.insert(bucket)
-        defer { analyzing.remove(bucket) }
+    func analyze(account: Account, bucket: String) {
+        Task { await analyzeNow(account: account, bucket: bucket) }
+    }
+
+    func analyzeNow(account: Account, bucket: String) async {
+        let key = Self.statsKey(account.id, bucket)
+        guard let client = client(for: account), !analyzing.contains(key) else { return }
+        analyzing.insert(key)
+        defer { analyzing.remove(key) }
         do {
             let objects = try await client.listAllObjects(bucket: bucket)
-            stats[bucket] = Self.computeStats(bucket: bucket, objects: objects)
+            stats[key] = Self.computeStats(bucket: bucket, objects: objects)
         } catch {
             NSLog("Buckett: analyze failed for \(bucket): \(error.localizedDescription)")
         }
     }
 
-    /// Analyzes every bucket that has no stats yet or whose stats are older
-    /// than 15 minutes. Runs sequentially so large accounts aren't hammered.
-    func autoAnalyzeAll() {
+    /// Analyzes the account's buckets that have no stats yet or whose stats
+    /// are older than 15 minutes. Sequential so accounts aren't hammered.
+    func autoAnalyze(account: Account) {
         let staleBefore = Date().addingTimeInterval(-15 * 60)
-        let names = buckets.map(\.name)
+        let names = bucketList(for: account.id).map(\.name)
         Task {
             for name in names {
-                if let existing = stats[name], existing.analyzedAt > staleBefore { continue }
-                await analyzeNow(bucket: name)
+                if let existing = stats[Self.statsKey(account.id, name)],
+                   existing.analyzedAt > staleBefore { continue }
+                await analyzeNow(account: account, bucket: name)
             }
         }
     }
 
+    func autoAnalyzeAll() {
+        guard let account = selectedAccount else { return }
+        autoAnalyze(account: account)
+    }
+
     private func scheduleStatsRefresh(bucket: String) {
+        // Uploads only carry the bucket name; resolve the owning account,
+        // preferring the selected one when names collide across accounts.
+        var owner: Account?
+        if let selected = selectedAccount,
+           bucketList(for: selected.id).contains(where: { $0.name == bucket }) {
+            owner = selected
+        } else {
+            owner = accountStore.accounts.first { account in
+                bucketList(for: account.id).contains { $0.name == bucket }
+            }
+        }
+        guard let owner else { return }
         statsRefreshTasks[bucket]?.cancel()
         statsRefreshTasks[bucket] = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 4_000_000_000)
             guard !Task.isCancelled else { return }
-            await self?.analyzeNow(bucket: bucket)
+            await self?.analyzeNow(account: owner, bucket: bucket)
         }
     }
 
