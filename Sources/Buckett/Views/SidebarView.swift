@@ -11,6 +11,7 @@ struct SidebarView: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.appTheme) private var theme
     @ObservedObject private var aliasStore = BucketAliases.shared
+    @AppStorage("sidebarShowAllAccounts") private var showAllAccounts = false
     @State private var showNewBucket = false
     @State private var aliasTarget: AccountBucket?
     @State private var deleteTarget: AccountBucket?
@@ -18,14 +19,26 @@ struct SidebarView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
+            accountSwitcher
+                .padding(.horizontal, 12)
+                .padding(.top, 4)
 
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 6) {
                     overviewRow
-                        .padding(.top, 6)
+                        .padding(.top, 12)
 
-                    ForEach(appState.accountStore.accounts) { account in
-                        accountSection(account)
+                    bucketsHeader
+                        .padding(.top, 12)
+                        .padding(.horizontal, 4)
+
+                    if showAllAccounts {
+                        ForEach(appState.accountStore.accounts) { account in
+                            accountCaption(account)
+                            bucketRows(for: account)
+                        }
+                    } else if let account = appState.selectedAccount {
+                        bucketRows(for: account)
                     }
 
                     if let error = appState.bucketsError {
@@ -58,17 +71,95 @@ struct SidebarView: View {
             Text("Buckett")
                 .font(.title3.weight(.bold))
             Spacer()
-            Button {
-                Task { await appState.loadBuckets() }
-            } label: {
-                Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 11, weight: .semibold))
-            }
-            .buttonStyle(.borderless)
-            .help("Refresh all accounts")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
+    }
+
+    // MARK: - Account switcher (accounts + "All Accounts")
+
+    @ViewBuilder
+    private var accountSwitcher: some View {
+        if appState.accountStore.accounts.isEmpty {
+            Button {
+                appState.showOnboarding = true
+            } label: {
+                Label("Add Account…", systemImage: "person.crop.circle.badge.plus")
+                    .frame(maxWidth: .infinity)
+            }
+            .controlSize(.large)
+        } else {
+            Menu {
+                ForEach(appState.accountStore.accounts) { account in
+                    Button {
+                        showAllAccounts = false
+                        appState.selectAccount(account.id)
+                    } label: {
+                        HStack {
+                            Image(systemName: account.provider.symbolName)
+                            Text(account.name.isEmpty ? account.provider.displayName : account.name)
+                            if !showAllAccounts && account.id == appState.selectedAccountID {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+                Divider()
+                Button {
+                    showAllAccounts = true
+                } label: {
+                    HStack {
+                        Image(systemName: "square.stack.3d.up")
+                        Text("All Accounts")
+                        if showAllAccounts {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+                Divider()
+                Button("Add Account…") {
+                    appState.showOnboarding = true
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: showAllAccounts
+                        ? "square.stack.3d.up"
+                        : (appState.selectedAccount?.provider.symbolName ?? "cloud"))
+                        .foregroundStyle(theme.gradient)
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(switcherTitle)
+                            .font(.callout.weight(.medium))
+                            .lineLimit(1)
+                        Text(switcherSubtitle)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: 9))
+            }
+            .menuStyle(.borderlessButton)
+        }
+    }
+
+    private var switcherTitle: String {
+        if showAllAccounts { return "All Accounts" }
+        guard let account = appState.selectedAccount else { return "Select account" }
+        return account.name.isEmpty ? account.provider.displayName : account.name
+    }
+
+    private var switcherSubtitle: String {
+        if showAllAccounts {
+            let count = appState.accountStore.accounts.count
+            return "\(count) account\(count == 1 ? "" : "s")"
+        }
+        return appState.selectedAccount?.provider.displayName ?? ""
     }
 
     private var overviewRow: some View {
@@ -97,40 +188,56 @@ struct SidebarView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - Account sections (all accounts, all buckets)
-
-    @ViewBuilder
-    private func accountSection(_ account: Account) -> some View {
-        let buckets = appState.bucketList(for: account.id)
-        let isSelectedAccount = account.id == appState.selectedAccountID
-
-        HStack(spacing: 6) {
-            Image(systemName: account.provider.symbolName)
-                .font(.system(size: 10))
-                .foregroundStyle(isSelectedAccount ? AnyShapeStyle(theme.gradient) : AnyShapeStyle(.secondary))
-            Text((account.name.isEmpty ? account.provider.displayName : account.name).uppercased())
+    private var bucketsHeader: some View {
+        HStack {
+            Text("BUCKETS")
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.secondary)
-                .lineLimit(1)
             Spacer()
-            if isSelectedAccount && appState.bucketsLoading {
+            if appState.bucketsLoading {
                 ProgressView().controlSize(.mini)
             }
             Button {
-                appState.selectAccount(account.id)
-                showNewBucket = true
+                Task { await appState.loadBuckets() }
             } label: {
-                Image(systemName: "plus")
+                Image(systemName: "arrow.clockwise")
                     .font(.system(size: 10, weight: .semibold))
             }
             .buttonStyle(.borderless)
-            .help("New bucket in this account")
+            .help("Refresh buckets")
+            Button {
+                showNewBucket = true
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 11, weight: .semibold))
+            }
+            .buttonStyle(.borderless)
+            .help("New bucket in the current account")
+            .disabled(appState.currentClient == nil)
         }
-        .padding(.top, 12)
+    }
+
+    private func accountCaption(_ account: Account) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: account.provider.symbolName)
+                .font(.system(size: 9))
+            Text((account.name.isEmpty ? account.provider.displayName : account.name).uppercased())
+                .font(.caption2.weight(.semibold))
+                .lineLimit(1)
+            Spacer()
+        }
+        .foregroundStyle(.tertiary)
+        .padding(.top, 8)
         .padding(.horizontal, 4)
+    }
+
+    @ViewBuilder
+    private func bucketRows(for account: Account) -> some View {
+        let buckets = appState.bucketList(for: account.id)
+        let isSelectedAccount = account.id == appState.selectedAccountID
 
         if buckets.isEmpty {
-            Text(isSelectedAccount && appState.bucketsLoading ? "Loading…" : "No buckets")
+            Text(isSelectedAccount && appState.bucketsLoading ? "Loading…" : "No buckets yet. Create one with +")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
                 .padding(.horizontal, 6)
@@ -181,13 +288,6 @@ struct SidebarView: View {
                     .font(.callout)
             }
             .buttonStyle(.borderless)
-            Button {
-                appState.showOnboarding = true
-            } label: {
-                Image(systemName: "person.crop.circle.badge.plus")
-            }
-            .buttonStyle(.borderless)
-            .help("Add account")
             Spacer()
             Text("v\(AppVersion.current)")
                 .font(.caption2)
