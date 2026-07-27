@@ -6,6 +6,7 @@ struct SidebarView: View {
     @ObservedObject private var aliasStore = BucketAliases.shared
     @State private var showNewBucket = false
     @State private var aliasTarget: Bucket?
+    @State private var deleteTarget: Bucket?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -72,6 +73,10 @@ struct SidebarView: View {
                                     }
                                 }
                             }
+                            Divider()
+                            Button("Delete Bucket…", role: .destructive) {
+                                deleteTarget = bucket
+                            }
                         }
                         .help(
                             aliasFor(bucket) == nil ? bucket.name : "Bucket: \(bucket.name)"
@@ -106,6 +111,9 @@ struct SidebarView: View {
             if let accountID = appState.selectedAccountID {
                 AliasSheet(accountID: accountID, bucket: bucket.name)
             }
+        }
+        .sheet(item: $deleteTarget) { bucket in
+            DeleteBucketSheet(bucket: bucket)
         }
     }
 
@@ -348,6 +356,124 @@ struct AliasSheet: View {
         .padding(22)
         .onAppear {
             alias = BucketAliases.shared.alias(accountID: accountID, bucket: bucket) ?? ""
+        }
+    }
+}
+
+// MARK: - Delete bucket sheet
+
+/// Type-to-confirm destructive flow: the bucket name must be typed exactly,
+/// and emptying a non-empty bucket is an explicit opt-in.
+struct DeleteBucketSheet: View {
+    let bucket: Bucket
+
+    @EnvironmentObject private var appState: AppState
+    @Environment(\.dismiss) private var dismiss
+    @State private var confirmText = ""
+    @State private var emptyFirst = false
+    @State private var deleting = false
+    @State private var errorMessage: String?
+
+    private var stats: BucketStats? {
+        appState.stats[bucket.name]
+    }
+
+    private var confirmed: Bool {
+        confirmText == bucket.name
+    }
+
+    var body: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "trash.circle.fill")
+                .font(.system(size: 34))
+                .foregroundStyle(.red)
+            Text("Delete Bucket")
+                .font(.title3.weight(.semibold))
+
+            VStack(spacing: 6) {
+                Text("This permanently deletes “\(bucket.name)” from \(appState.selectedAccount?.provider.displayName ?? "your provider").")
+                    .multilineTextAlignment(.center)
+                if let stats, stats.objectCount > 0 {
+                    Text("It currently contains \(stats.objectCount) object\(stats.objectCount == 1 ? "" : "s") (\(stats.formattedSize)).")
+                        .foregroundStyle(.secondary)
+                }
+                Text("This cannot be undone.")
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(.red)
+            }
+            .font(.callout)
+            .frame(width: 320)
+
+            Toggle(isOn: $emptyFirst) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Also delete all objects inside")
+                    Text("Required for non-empty buckets — the provider only deletes empty buckets.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(width: 320)
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Type the bucket name to confirm:")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                TextField(bucket.name, text: $confirmText)
+                    .textFieldStyle(.roundedBorder)
+                    .autocorrectionDisabled()
+            }
+            .frame(width: 320)
+
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .frame(width: 320)
+            }
+
+            HStack {
+                Button("Cancel") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                    .disabled(deleting)
+                Spacer()
+                Button(role: .destructive) {
+                    deleteBucket()
+                } label: {
+                    if deleting {
+                        HStack(spacing: 6) {
+                            ProgressView().controlSize(.small)
+                            Text(emptyFirst ? "Emptying & deleting…" : "Deleting…")
+                        }
+                    } else {
+                        Text("Delete Bucket")
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.red)
+                .disabled(!confirmed || deleting)
+            }
+            .frame(width: 320)
+        }
+        .padding(22)
+        .interactiveDismissDisabled(deleting)
+    }
+
+    private func deleteBucket() {
+        deleting = true
+        errorMessage = nil
+        let name = bucket.name
+        let empty = emptyFirst
+        Task {
+            do {
+                try await appState.deleteBucket(named: name, emptyFirst: empty)
+                dismiss()
+                ToastCenter.shared.show("Bucket deleted", detail: name)
+            } catch let error as S3Error where error.code == "BucketNotEmpty" {
+                errorMessage = "The bucket isn't empty. Enable “Also delete all objects inside” to empty it first."
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            deleting = false
         }
     }
 }
