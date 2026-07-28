@@ -178,9 +178,40 @@ struct ObjectListView: View {
     let onOpen: (RemoteObject) -> Void
     let onContextAction: (ObjectAction, [RemoteObject]) -> Void
 
+    /// Bridges the table's clickable-header sort state to the model's
+    /// sortField/sortAscending (the single source also used by the grid
+    /// and the sort menu), so all three stay in sync.
+    private var tableSort: Binding<[KeyPathComparator<RemoteObject>]> {
+        Binding(
+            get: {
+                let order: SortOrder = model.sortAscending ? .forward : .reverse
+                switch model.sortField {
+                case .name: return [KeyPathComparator(\RemoteObject.name, order: order)]
+                case .size: return [KeyPathComparator(\RemoteObject.size, order: order)]
+                case .date: return [KeyPathComparator(\RemoteObject.sortDate, order: order)]
+                case .kind: return [KeyPathComparator(\RemoteObject.fileExtension, order: order)]
+                }
+            },
+            set: { comparators in
+                guard let first = comparators.first else { return }
+                model.sortAscending = first.order == .forward
+                let keyPath = first.keyPath
+                if keyPath == \RemoteObject.name {
+                    model.sortField = .name
+                } else if keyPath == \RemoteObject.size {
+                    model.sortField = .size
+                } else if keyPath == \RemoteObject.sortDate {
+                    model.sortField = .date
+                } else if keyPath == \RemoteObject.fileExtension {
+                    model.sortField = .kind
+                }
+            }
+        )
+    }
+
     var body: some View {
-        Table(model.displayItems, selection: $model.selection) {
-            TableColumn("Name") { object in
+        Table(model.displayItems, selection: $model.selection, sortOrder: tableSort) {
+            TableColumn("Name", value: \.name) { object in
                 HStack(spacing: 7) {
                     Image(systemName: object.symbolName)
                         .foregroundStyle(object.isFolder ? Color.accentColor : Color.secondary)
@@ -191,14 +222,14 @@ struct ObjectListView: View {
             }
             .width(min: 200, ideal: 340)
 
-            TableColumn("Size") { object in
+            TableColumn("Size", value: \.size) { object in
                 Text(object.formattedSize)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
             }
             .width(min: 60, ideal: 90)
 
-            TableColumn("Modified") { object in
+            TableColumn("Modified", value: \.sortDate) { object in
                 if let date = object.lastModified {
                     Text(date.formatted(date: .abbreviated, time: .shortened))
                         .foregroundStyle(.secondary)
@@ -208,7 +239,7 @@ struct ObjectListView: View {
             }
             .width(min: 120, ideal: 160)
 
-            TableColumn("Kind") { object in
+            TableColumn("Kind", value: \.fileExtension) { object in
                 Text(object.isFolder ? "Folder" : kindLabel(for: object))
                     .foregroundStyle(.secondary)
             }

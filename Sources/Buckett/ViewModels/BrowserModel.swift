@@ -27,8 +27,12 @@ final class BrowserModel: ObservableObject {
             UserDefaults.standard.set(viewMode.rawValue, forKey: "defaultViewMode")
         }
     }
-    @Published var sortField: SortField = .name
-    @Published var sortAscending = true
+    @Published var sortField: SortField {
+        didSet { UserDefaults.standard.set(sortField.rawValue, forKey: "sortField") }
+    }
+    @Published var sortAscending: Bool {
+        didSet { UserDefaults.standard.set(sortAscending, forKey: "sortAscending") }
+    }
     @Published var selection = Set<String>()
     @Published var isTruncated = false
     @Published var lastSynced: Date?
@@ -44,6 +48,10 @@ final class BrowserModel: ObservableObject {
         self.viewMode = ViewMode(
             rawValue: UserDefaults.standard.string(forKey: "defaultViewMode") ?? ""
         ) ?? .grid
+        self.sortField = SortField(
+            rawValue: UserDefaults.standard.string(forKey: "sortField") ?? ""
+        ) ?? .name
+        self.sortAscending = UserDefaults.standard.object(forKey: "sortAscending") as? Bool ?? true
 
         observer = NotificationCenter.default.addObserver(
             forName: .buckettTransferCompleted, object: nil, queue: .main
