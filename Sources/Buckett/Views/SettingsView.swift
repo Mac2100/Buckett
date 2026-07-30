@@ -45,6 +45,8 @@ struct AboutSettingsView: View {
                 )
             }
             .padding(.top, 6)
+            SupportButtons()
+                .padding(.top, 10)
             Spacer()
         }
         .frame(maxWidth: .infinity)
