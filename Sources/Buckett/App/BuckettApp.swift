@@ -24,6 +24,7 @@ struct BuckettApp: App {
                 Button("Check for Updates…") {
                     Task { await appState.updates.check(userInitiated: true) }
                 }
+                Link("Buy Me a Coffee…", destination: BuyMeACoffee.url)
             }
             SidebarCommands()
         }
