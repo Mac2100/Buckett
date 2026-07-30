@@ -45,7 +45,7 @@ struct AboutSettingsView: View {
                 )
             }
             .padding(.top, 6)
-            BuyMeACoffeeButton()
+            SupportButtons()
                 .padding(.top, 10)
             Spacer()
         }

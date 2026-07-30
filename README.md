@@ -1,5 +1,7 @@
 # Buckett
 
+[![Star on GitHub](https://img.shields.io/github/stars/Mac2100/Buckett?style=flat&logo=github&label=Star)](https://github.com/Mac2100/Buckett)
+
 An open-source, native macOS bucket explorer for **Cloudflare R2** and **Backblaze B2** (and any other S3-compatible storage), built with SwiftUI.
 
 Buckett is a free, open alternative to paid closed-source R2 clients: your credentials stay in your macOS Keychain, every API request goes directly from your Mac to your storage provider, and you can read every line of code that touches them.
@@ -83,7 +85,9 @@ To cut a release: bump `AppVersion.marketing` in `Sources/Buckett/Support/AppVer
 
 ## Support
 
-Buckett is free and open source. If it saves you a trip to the R2 or B2 dashboard, you can say thanks with a coffee:
+Buckett is free and open source. If it saves you a trip to the R2 or B2 dashboard, the easiest way to help is a
+**[star on GitHub](https://github.com/Mac2100/Buckett)** — it costs nothing and helps other people
+find the app. If you'd rather say thanks with a coffee:
 
 <a href="https://www.buymeacoffee.com/Mac2100" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" style="height: 60px !important;width: 217px !important;" ></a>
 
