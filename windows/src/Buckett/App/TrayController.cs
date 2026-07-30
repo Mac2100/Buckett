@@ -88,18 +88,29 @@ public sealed class TrayController : IDisposable
 
     public void SetDropTargetVisible(bool visible)
     {
-        if (visible)
+        try
         {
-            if (_dropPad != null) return;
-            _dropPad = new DropPadWindow();
-            _dropPad.Closed += (_, _) => _dropPad = null;
-            _dropPad.Show();
+            if (visible)
+            {
+                if (_dropPad != null) return;
+                _dropPad = new DropPadWindow();
+                _dropPad.Closed += (_, _) => _dropPad = null;
+                _dropPad.Show();
+            }
+            else
+            {
+                _dropPad?.Close();
+                _dropPad = null;
+                DropOverlays.Shared.CloseHover();
+            }
         }
-        else
+        catch (Exception error)
         {
-            _dropPad?.Close();
+            // A transparent, always-on-top window is the most likely thing to
+            // be refused by an unusual display setup or a remote session. That
+            // must not take the rest of the app with it.
+            Log.Warn($"drop target unavailable: {error.Message}");
             _dropPad = null;
-            DropOverlays.Shared.CloseHover();
         }
     }
 

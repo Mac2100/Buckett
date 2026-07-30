@@ -409,9 +409,15 @@ public sealed class DropOverlays
         });
     }
 
-    private static void RunAnimation(Glyph fileIcon, Border bucketBadge, Control caption)
+    internal static void RunAnimation(Glyph fileIcon, Border bucketBadge, Control caption)
     {
-        // The file falls in and shrinks away…
+        // Animate TranslateTransform.Y / ScaleTransform.Scale*, never
+        // RenderTransform itself — only the former have registered animators.
+        // The animation is applied to the control; Avalonia's transform animator
+        // reaches into the RenderTransform assigned here.
+        fileIcon.RenderTransform = new TranslateTransform();
+
+        // The file falls in…
         var fall = new Animation
         {
             Duration = TimeSpan.FromMilliseconds(400),
@@ -422,28 +428,35 @@ public sealed class DropOverlays
                 new KeyFrame
                 {
                     Cue = new Cue(0),
-                    Setters =
-                    {
-                        new Setter(TranslateTransform.YProperty, 0.0),
-                        new Setter(Visual.OpacityProperty, 1.0)
-                    }
+                    Setters = { new Setter(TranslateTransform.YProperty, 0.0) }
                 },
                 new KeyFrame
                 {
                     Cue = new Cue(1),
-                    Setters =
-                    {
-                        new Setter(TranslateTransform.YProperty, 42.0),
-                        new Setter(Visual.OpacityProperty, 0.0)
-                    }
+                    Setters = { new Setter(TranslateTransform.YProperty, 42.0) }
                 }
             }
         };
-        fileIcon.RenderTransform = new TranslateTransform();
         _ = fall.RunAsync(fileIcon);
 
+        // …fading out as it goes…
+        var fadeOut = new Animation
+        {
+            Duration = TimeSpan.FromMilliseconds(400),
+            Easing = new QuadraticEaseIn(),
+            FillMode = FillMode.Forward,
+            Children =
+            {
+                new KeyFrame { Cue = new Cue(0), Setters = { new Setter(Visual.OpacityProperty, 1.0) } },
+                new KeyFrame { Cue = new Cue(1), Setters = { new Setter(Visual.OpacityProperty, 0.0) } }
+            }
+        };
+        _ = fadeOut.RunAsync(fileIcon);
+
         // …the bucket squashes on impact and springs back…
-        var squash = new Animation
+        bucketBadge.RenderTransform = new ScaleTransform();
+
+        var impact = new Animation
         {
             Duration = TimeSpan.FromMilliseconds(360),
             Delay = TimeSpan.FromMilliseconds(380),
@@ -480,8 +493,7 @@ public sealed class DropOverlays
                 }
             }
         };
-        bucketBadge.RenderTransform = new ScaleTransform();
-        _ = squash.RunAsync(bucketBadge);
+        _ = impact.RunAsync(bucketBadge);
 
         // …and the label fades in.
         var fade = new Animation

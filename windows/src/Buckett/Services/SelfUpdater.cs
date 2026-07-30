@@ -22,8 +22,12 @@ public sealed class SelfUpdater : ObservableObject
 {
     public static SelfUpdater Shared { get; } = new();
 
-    private static readonly HttpClient Http = new() { Timeout = Timeout };
-    private static readonly TimeSpan Timeout = TimeSpan.FromMinutes(30);
+    /// Generous, because this downloads a whole release archive. Written as a
+    /// literal rather than referencing another static field: static initialisers
+    /// run in declaration order, so reading a field declared further down would
+    /// silently see TimeSpan.Zero — which HttpClient rejects, taking the app
+    /// down before its first window appears.
+    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromMinutes(30) };
 
     private UpdatePhase _phase = UpdatePhase.Idle;
     private string? _failureMessage;
