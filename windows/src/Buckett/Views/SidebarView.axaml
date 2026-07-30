@@ -1,0 +1,161 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:Buckett.Views"
+             x:Class="Buckett.Views.SidebarView">
+
+  <DockPanel>
+
+    <!-- Header -->
+    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="9"
+                Margin="14,12">
+      <views:AppGlyph GlyphSize="28" VerticalAlignment="Center" />
+      <TextBlock Text="Buckett" Classes="title3" VerticalAlignment="Center" />
+    </StackPanel>
+
+    <!-- Account switcher -->
+    <Panel DockPanel.Dock="Top" Margin="12,4,12,0">
+      <Button x:Name="AddFirstAccountButton"
+              HorizontalAlignment="Stretch"
+              HorizontalContentAlignment="Center"
+              Click="OnAddAccount"
+              IsVisible="False">
+        <StackPanel Orientation="Horizontal" Spacing="7">
+          <views:Glyph Symbol="person.crop.circle.badge.plus" Size="15" />
+          <TextBlock Text="Add Account…" />
+        </StackPanel>
+      </Button>
+
+      <Button x:Name="AccountSwitcher"
+              Classes="plain"
+              HorizontalAlignment="Stretch"
+              Padding="10,7"
+              Background="{DynamicResource SubtleFillBrush}"
+              CornerRadius="9"
+              Click="OnAccountSwitcher">
+        <Grid ColumnDefinitions="Auto,*,Auto" >
+          <views:Glyph x:Name="SwitcherIcon" Grid.Column="0" Size="16"
+                       VerticalAlignment="Center" Margin="0,0,8,0"
+                       Foreground="{DynamicResource ThemePrimaryBrush}" />
+          <StackPanel Grid.Column="1" VerticalAlignment="Center">
+            <TextBlock x:Name="SwitcherTitle" Classes="callout" FontWeight="Medium" />
+            <TextBlock x:Name="SwitcherSubtitle" Classes="caption2 secondary" />
+          </StackPanel>
+          <views:Glyph Grid.Column="2" Symbol="chevron.up.chevron.down" Size="12"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource SecondaryTextBrush}" />
+        </Grid>
+      </Button>
+    </Panel>
+
+    <!-- Footer -->
+    <Border DockPanel.Dock="Bottom" BorderThickness="0,1,0,0"
+            BorderBrush="{DynamicResource SeparatorBrush}">
+      <Grid ColumnDefinitions="Auto,Auto,*,Auto" Margin="12,8">
+        <Button Grid.Column="0" Classes="plain" Padding="4" Click="OnOpenSettings" ToolTip.Tip="Settings">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <views:Glyph Symbol="gearshape" Size="15" />
+            <TextBlock Text="Settings" Classes="callout" />
+          </StackPanel>
+        </Button>
+        <Button Grid.Column="1" Classes="icon" Margin="4,0,0,0"
+                Click="OnMoreMenu" ToolTip.Tip="More">
+          <views:Glyph Symbol="ellipsis.circle" Size="15" />
+        </Button>
+        <TextBlock Grid.Column="3" x:Name="VersionLabel" Classes="caption2 tertiary"
+                   VerticalAlignment="Center" />
+      </Grid>
+    </Border>
+
+    <!-- Bucket list -->
+    <ScrollViewer Padding="10,0" HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Spacing="6">
+
+        <Button x:Name="OverviewRow" Classes="plain" HorizontalAlignment="Stretch"
+                Margin="0,12,0,0" Padding="10,7" CornerRadius="9"
+                Click="OnSelectOverview">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <views:Glyph Symbol="chart.bar.xaxis" Size="16" Width="18" />
+            <TextBlock Text="Overview" Classes="callout" FontWeight="Medium" />
+          </StackPanel>
+        </Button>
+
+        <Grid ColumnDefinitions="*,Auto,Auto,Auto" Margin="4,12,4,0">
+          <TextBlock Grid.Column="0" Text="BUCKETS" Classes="caption2 secondary"
+                     FontWeight="SemiBold" VerticalAlignment="Center" />
+          <ProgressBar Grid.Column="1" x:Name="BucketsSpinner" IsIndeterminate="True"
+                       IsVisible="False" Width="34" Height="3" VerticalAlignment="Center"
+                       Margin="0,0,6,0" />
+          <Button Grid.Column="2" Classes="icon" Padding="4" Click="OnRefreshBuckets"
+                  ToolTip.Tip="Refresh buckets">
+            <views:Glyph Symbol="arrow.clockwise" Size="12" />
+          </Button>
+          <Button Grid.Column="3" x:Name="NewBucketButton" Classes="icon" Padding="4"
+                  Click="OnNewBucket" ToolTip.Tip="New bucket in the current account">
+            <views:Glyph Symbol="plus" Size="12" />
+          </Button>
+        </Grid>
+
+        <ItemsControl x:Name="RowsHost">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Panel Margin="0,0,0,6">
+
+                <!-- Account caption, shown in All Accounts mode -->
+                <StackPanel Orientation="Horizontal" Spacing="5" Margin="4,8,4,0"
+                            IsVisible="{Binding IsCaption}">
+                  <views:Glyph Symbol="{Binding Symbol}" Size="11"
+                               Foreground="{DynamicResource TertiaryTextBrush}"
+                               VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding Caption}" Classes="caption2 tertiary"
+                             FontWeight="SemiBold" VerticalAlignment="Center" />
+                </StackPanel>
+
+                <!-- Placeholder line when an account has no buckets -->
+                <TextBlock Text="{Binding Placeholder}" Classes="caption tertiary"
+                           Margin="6,2" TextWrapping="Wrap"
+                           IsVisible="{Binding IsPlaceholder}" />
+
+                <!-- Bucket card -->
+                <Border Classes="rowCard" Classes.selected="{Binding IsSelected}"
+                        IsVisible="{Binding IsBucket}"
+                        Cursor="Hand"
+                        PointerPressed="OnBucketRowPressed">
+                  <Border.ContextFlyout>
+                    <MenuFlyout>
+                      <MenuItem Header="{Binding AliasMenuTitle}" Click="OnEditAlias" />
+                      <MenuItem Header="Remove Alias" Click="OnRemoveAlias"
+                                IsVisible="{Binding HasAlias}" />
+                      <Separator />
+                      <MenuItem Header="Delete Bucket…" Click="OnDeleteBucket" />
+                    </MenuFlyout>
+                  </Border.ContextFlyout>
+                  <StackPanel Spacing="7">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <views:Glyph Symbol="tray.full.fill" Size="15" VerticalAlignment="Center"
+                                   Foreground="{Binding IconBrush}" />
+                      <TextBlock Text="{Binding DisplayName}" Classes="callout"
+                                 FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                                 VerticalAlignment="Center" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="4"
+                                IsVisible="{Binding HasSubtitle}">
+                      <views:Glyph Symbol="internaldrive" Size="11" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                   IsVisible="{Binding HasStats}" />
+                      <TextBlock Text="{Binding Subtitle}" Classes="caption2 secondary" />
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+              </Panel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <TextBlock x:Name="ErrorLabel" Classes="caption danger" TextWrapping="Wrap"
+                   Margin="6" IsVisible="False" />
+        <Panel Height="12" />
+      </StackPanel>
+    </ScrollViewer>
+
+  </DockPanel>
+</UserControl>

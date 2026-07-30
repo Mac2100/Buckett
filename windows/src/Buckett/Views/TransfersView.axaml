@@ -1,0 +1,110 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:Buckett.Views"
+             x:Class="Buckett.Views.TransfersView">
+
+  <DockPanel>
+
+    <Border DockPanel.Dock="Top" BorderThickness="0,0,0,1"
+            BorderBrush="{DynamicResource SeparatorBrush}">
+      <Grid ColumnDefinitions="Auto,*,Auto" Margin="16,9">
+        <Border Grid.Column="0" Classes="segments">
+          <StackPanel x:Name="FilterHost" Orientation="Horizontal" Spacing="2" />
+        </Border>
+        <Button Grid.Column="2" x:Name="ClearButton" Content="Clear Completed"
+                Click="OnClearFinished" />
+      </Grid>
+    </Border>
+
+    <Panel>
+      <ScrollViewer x:Name="ListScroller">
+        <ItemsControl x:Name="Host" Margin="16" MaxWidth="820">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <StackPanel Spacing="8" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Border Classes="panel" CornerRadius="11" Padding="14,11">
+                <Grid ColumnDefinitions="Auto,*,Auto">
+
+                  <views:Glyph Grid.Column="0" Symbol="{Binding SymbolName}" Size="20" Width="24"
+                               VerticalAlignment="Center" Margin="0,0,12,0"
+                               Foreground="{DynamicResource ThemePrimaryBrush}" />
+
+                  <StackPanel Grid.Column="1" Spacing="4">
+                    <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+                      <TextBlock Grid.Column="0" Text="{Binding DisplayName}" Classes="callout"
+                                 FontWeight="Medium" TextTrimming="CharacterEllipsis" />
+                      <views:Glyph Grid.Column="1" Symbol="checkmark.circle.fill" Size="13"
+                                   Margin="8,0,0,0" VerticalAlignment="Center"
+                                   IsVisible="{Binding IsCompleted}"
+                                   Foreground="{DynamicResource SuccessBrush}" />
+                      <TextBlock Grid.Column="3" Text="{Binding FormattedTotal}"
+                                 Classes="caption secondary digits" VerticalAlignment="Center" />
+                    </Grid>
+
+                    <TextBlock Text="{Binding StatusText}" Classes="caption secondary"
+                               IsVisible="{Binding IsQueued}" />
+
+                    <StackPanel Spacing="4" IsVisible="{Binding IsRunning}">
+                      <ProgressBar Minimum="0" Maximum="1" Value="{Binding FractionCompleted}"
+                                   Height="4" />
+                      <StackPanel Orientation="Horizontal" Spacing="10">
+                        <TextBlock Text="{Binding PercentText}" Classes="caption2 secondary digits" />
+                        <TextBlock Text="{Binding ProgressText}" Classes="caption2 secondary digits" />
+                        <TextBlock Text="{Binding SpeedText}" Classes="caption2 secondary digits" />
+                        <TextBlock Text="{Binding PartText}" Classes="caption2 secondary digits"
+                                   IsVisible="{Binding HasPartProgress}" />
+                      </StackPanel>
+                    </StackPanel>
+
+                    <TextBlock Text="{Binding CompletedText}" Classes="caption secondary"
+                               TextTrimming="CharacterEllipsis" IsVisible="{Binding IsCompleted}" />
+                    <TextBlock Text="{Binding StatusText}" Classes="caption warning"
+                               IsVisible="{Binding IsCancelled}" />
+                    <TextBlock Text="{Binding StatusText}" Classes="caption danger"
+                               TextWrapping="Wrap" MaxLines="2" IsVisible="{Binding IsFailed}" />
+                  </StackPanel>
+
+                  <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6"
+                              VerticalAlignment="Center">
+                    <Button Classes="icon" Click="OnCancel" ToolTip.Tip="Cancel"
+                            IsVisible="{Binding CanCancel}">
+                      <views:Glyph Symbol="xmark.circle.fill" Size="17" />
+                    </Button>
+                    <Button Classes="icon" Click="OnRetry" ToolTip.Tip="Retry"
+                            IsVisible="{Binding CanRetry}">
+                      <views:Glyph Symbol="arrow.clockwise.circle.fill" Size="17" />
+                    </Button>
+                    <Button Classes="icon" Click="OnCopyLink"
+                            ToolTip.Tip="Copy share link (7 days)"
+                            IsVisible="{Binding ShowCopyLink}">
+                      <views:Glyph Symbol="link.circle.fill" Size="17" />
+                    </Button>
+                    <Button Classes="icon" Click="OnReveal" ToolTip.Tip="Show in Explorer"
+                            IsVisible="{Binding ShowReveal}">
+                      <views:Glyph Symbol="magnifyingglass.circle.fill" Size="17" />
+                    </Button>
+                  </StackPanel>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+
+      <StackPanel x:Name="EmptyBlock" Spacing="10" HorizontalAlignment="Center"
+                  VerticalAlignment="Center" IsVisible="False">
+        <views:Glyph Symbol="arrow.up.arrow.down.circle.fill" Size="38"
+                     HorizontalAlignment="Center"
+                     Foreground="{DynamicResource TertiaryTextBrush}" />
+        <TextBlock x:Name="EmptyTitle" Classes="title3 secondary" HorizontalAlignment="Center" />
+        <TextBlock Text="Uploads and downloads appear here with live progress."
+                   Classes="callout tertiary" HorizontalAlignment="Center" />
+      </StackPanel>
+    </Panel>
+
+  </DockPanel>
+</UserControl>

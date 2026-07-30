@@ -1,0 +1,195 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:Buckett.Views"
+             x:Class="Buckett.Views.StatisticsView">
+
+  <ScrollViewer>
+    <StackPanel Margin="18" Spacing="16">
+
+      <!-- Overview cards -->
+      <Panel>
+        <UniformGrid Columns="4">
+          <Border Classes="card" Margin="0,0,7,0" Padding="14">
+            <StackPanel Spacing="8">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0" Text="Storage" Classes="caption secondary"
+                           FontWeight="Medium" />
+                <views:Glyph Grid.Column="1" Symbol="internaldrive.fill" Size="17"
+                             Foreground="{DynamicResource ThemeSecondaryBrush}" />
+              </Grid>
+              <TextBlock x:Name="StorageValue" FontSize="23" FontWeight="Bold" Classes="digits" />
+              <TextBlock x:Name="StorageCaption" Classes="caption2 tertiary" />
+            </StackPanel>
+          </Border>
+
+          <Border Classes="card" Margin="7,0" Padding="14">
+            <StackPanel Spacing="8">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0" Text="Objects" Classes="caption secondary"
+                           FontWeight="Medium" />
+                <views:Glyph Grid.Column="1" Symbol="doc.on.doc.fill" Size="17"
+                             Foreground="{DynamicResource ThemePrimaryBrush}" />
+              </Grid>
+              <TextBlock x:Name="ObjectsValue" FontSize="23" FontWeight="Bold" Classes="digits" />
+              <TextBlock x:Name="ObjectsCaption" Classes="caption2 tertiary" />
+            </StackPanel>
+          </Border>
+
+          <Border Classes="card" Margin="7,0" Padding="14">
+            <StackPanel Spacing="8">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0" Text="Est. Monthly Cost" Classes="caption secondary"
+                           FontWeight="Medium" />
+                <views:Glyph Grid.Column="1" Symbol="dollarsign.circle.fill" Size="17"
+                             Foreground="{DynamicResource SuccessBrush}" />
+              </Grid>
+              <TextBlock x:Name="CostValue" FontSize="23" FontWeight="Bold" Classes="digits" />
+              <TextBlock Text="Storage only, after free tier" Classes="caption2 tertiary" />
+            </StackPanel>
+          </Border>
+
+          <Border Classes="card" Margin="7,0,0,0" Padding="14">
+            <StackPanel Spacing="8">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0" Text="Last Change" Classes="caption secondary"
+                           FontWeight="Medium" />
+                <views:Glyph Grid.Column="1" Symbol="clock.fill" Size="17"
+                             Foreground="{DynamicResource WarningBrush}" />
+              </Grid>
+              <TextBlock x:Name="LastChangeValue" FontSize="19" FontWeight="Bold" />
+              <TextBlock x:Name="LastChangeCaption" Classes="caption2 tertiary" />
+            </StackPanel>
+          </Border>
+        </UniformGrid>
+
+        <!-- "Analyze this bucket" prompt, shown until stats exist -->
+        <Border x:Name="AnalyzePrompt" Background="{DynamicResource GlassBrush}"
+                BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1"
+                CornerRadius="12" Padding="14" BoxShadow="0 4 12 0 #26000000"
+                HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="False">
+          <StackPanel Spacing="8">
+            <StackPanel x:Name="AnalyzingBlock" Orientation="Horizontal" Spacing="8"
+                        IsVisible="False">
+              <ProgressBar IsIndeterminate="True" Width="80" Height="3"
+                           VerticalAlignment="Center" />
+              <TextBlock Text="Analyzing bucket…" Classes="callout" FontWeight="SemiBold" />
+            </StackPanel>
+            <StackPanel x:Name="AnalyzeCta" Spacing="8">
+              <TextBlock Text="No usage data yet" Classes="callout" FontWeight="SemiBold"
+                         HorizontalAlignment="Center" />
+              <Button Classes="prominent" HorizontalAlignment="Center" Click="OnAnalyze">
+                <StackPanel Orientation="Horizontal" Spacing="7">
+                  <views:Glyph Symbol="chart.bar.doc.horizontal" Size="15"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource OnAccentTextBrush}" />
+                  <TextBlock Text="Analyze Bucket" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+      </Panel>
+
+      <!-- Upload activity + recent uploads -->
+      <Grid ColumnDefinitions="*,*">
+        <Border Grid.Column="0" Classes="card" Margin="0,0,8,0" Padding="16">
+          <StackPanel Spacing="10">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Grid.Column="0" Text="Upload Activity" Classes="headline" />
+              <TextBlock Grid.Column="1" x:Name="ActiveDaysLabel" Classes="caption secondary" />
+            </Grid>
+            <TextBlock Text="Files uploaded from this PC, last 5 weeks" Classes="caption tertiary" />
+            <ItemsControl x:Name="HeatmapHost">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <UniformGrid Columns="7" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Border Height="16" Margin="2" CornerRadius="3"
+                          Background="{Binding Fill}" ToolTip.Tip="{Binding Tip}" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+
+        <Border Grid.Column="1" Classes="card" Margin="8,0,0,0" Padding="16">
+          <StackPanel Spacing="10">
+            <TextBlock Text="Recent Uploads" Classes="headline" />
+            <TextBlock Text="Last 7 days, from this PC" Classes="caption tertiary" />
+            <ItemsControl x:Name="RecentHost">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <StackPanel Spacing="7" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Grid ColumnDefinitions="78,54,66,*">
+                    <TextBlock Grid.Column="0" Text="{Binding Day}" Classes="caption secondary" />
+                    <TextBlock Grid.Column="1" Text="{Binding Files}" Classes="caption" />
+                    <TextBlock Grid.Column="2" Text="{Binding Bytes}" Classes="caption secondary" />
+                    <ProgressBar Grid.Column="3" Minimum="0" Maximum="1"
+                                 Value="{Binding Fraction}" Height="7"
+                                 VerticalAlignment="Center" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+      </Grid>
+
+      <!-- File types + largest objects -->
+      <Grid x:Name="AnalysisRow" ColumnDefinitions="*,*" IsVisible="False">
+        <Border Grid.Column="0" Classes="card" Margin="0,0,8,0" Padding="16">
+          <StackPanel Spacing="10">
+            <TextBlock Text="Storage by File Type" Classes="headline" />
+            <TextBlock x:Name="NoTypesLabel" Text="No files" Classes="caption tertiary"
+                       IsVisible="False" />
+            <views:BarChart x:Name="TypesChart" RowHeight="26" />
+          </StackPanel>
+        </Border>
+
+        <Border Grid.Column="1" Classes="card" Margin="8,0,0,0" Padding="16">
+          <StackPanel Spacing="10">
+            <TextBlock Text="Largest Objects" Classes="headline" />
+            <TextBlock x:Name="NoObjectsLabel" Text="No files" Classes="caption tertiary"
+                       IsVisible="False" />
+            <ItemsControl x:Name="LargestHost">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <StackPanel Spacing="6" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Grid ColumnDefinitions="Auto,*,Auto">
+                    <views:Glyph Grid.Column="0" Symbol="{Binding Symbol}" Size="13" Width="15"
+                                 VerticalAlignment="Center" Margin="0,0,8,0"
+                                 Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <TextBlock Grid.Column="1" Text="{Binding Key}" Classes="caption"
+                               TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="2" Text="{Binding Size}" Classes="caption digits"
+                               FontWeight="Medium" VerticalAlignment="Center" Margin="8,0,0,0" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+      </Grid>
+
+      <StackPanel x:Name="AnalyzedFooter" Orientation="Horizontal" Spacing="10"
+                  IsVisible="False">
+        <TextBlock x:Name="AnalyzedLabel" Classes="caption tertiary" VerticalAlignment="Center" />
+        <Button Content="Re-analyze" Click="OnAnalyze" x:Name="ReanalyzeButton" />
+        <ProgressBar x:Name="ReanalyzeSpinner" IsIndeterminate="True" Width="60" Height="3"
+                     VerticalAlignment="Center" IsVisible="False" />
+      </StackPanel>
+
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

@@ -1,0 +1,66 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- Accent defaults; ThemeStore replaces these at startup and whenever the
+       user picks a different theme in Settings → Appearance. -->
+  <Color x:Key="ThemePrimaryColor">#5449E6</Color>
+  <Color x:Key="ThemeSecondaryColor">#0D998C</Color>
+  <SolidColorBrush x:Key="ThemePrimaryBrush" Color="#5449E6" />
+  <SolidColorBrush x:Key="ThemeSecondaryBrush" Color="#0D998C" />
+  <SolidColorBrush x:Key="ThemePrimarySoftBrush" Color="#5449E6" Opacity="0.16" />
+  <SolidColorBrush x:Key="ThemePrimaryFaintBrush" Color="#5449E6" Opacity="0.08" />
+  <SolidColorBrush x:Key="ThemePrimaryEdgeBrush" Color="#5449E6" Opacity="0.55" />
+  <LinearGradientBrush x:Key="ThemeGradientBrush" StartPoint="0%,0%" EndPoint="100%,100%">
+    <GradientStop Color="#5449E6" Offset="0" />
+    <GradientStop Color="#0D998C" Offset="1" />
+  </LinearGradientBrush>
+
+  <!-- Status colours, matching the macOS palette. -->
+  <SolidColorBrush x:Key="SuccessBrush" Color="#28A745" />
+  <SolidColorBrush x:Key="DangerBrush" Color="#E5484D" />
+  <SolidColorBrush x:Key="WarningBrush" Color="#F08C1B" />
+  <SolidColorBrush x:Key="InfoBrush" Color="#2F80ED" />
+
+  <ResourceDictionary.ThemeDictionaries>
+
+    <ResourceDictionary x:Key="Light">
+      <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#F4F4F6" />
+      <SolidColorBrush x:Key="SidebarBackgroundBrush" Color="#EBEBEF" />
+      <SolidColorBrush x:Key="CardBackgroundBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="GlassBrush" Color="#FFFFFF" Opacity="0.82" />
+      <SolidColorBrush x:Key="FaintFillBrush" Color="#000000" Opacity="0.035" />
+      <SolidColorBrush x:Key="SubtleFillBrush" Color="#000000" Opacity="0.05" />
+      <SolidColorBrush x:Key="HoverFillBrush" Color="#000000" Opacity="0.075" />
+      <SolidColorBrush x:Key="QuaternaryFillBrush" Color="#000000" Opacity="0.08" />
+      <SolidColorBrush x:Key="BorderSoftBrush" Color="#000000" Opacity="0.09" />
+      <SolidColorBrush x:Key="BorderStrongBrush" Color="#000000" Opacity="0.18" />
+      <SolidColorBrush x:Key="PrimaryTextBrush" Color="#16161A" />
+      <SolidColorBrush x:Key="SecondaryTextBrush" Color="#5F5F68" />
+      <SolidColorBrush x:Key="TertiaryTextBrush" Color="#8C8C96" />
+      <SolidColorBrush x:Key="SeparatorBrush" Color="#000000" Opacity="0.10" />
+      <SolidColorBrush x:Key="ScrimBrush" Color="#000000" Opacity="0.28" />
+      <SolidColorBrush x:Key="OnAccentTextBrush" Color="#FFFFFF" />
+    </ResourceDictionary>
+
+    <ResourceDictionary x:Key="Dark">
+      <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#1B1B1E" />
+      <SolidColorBrush x:Key="SidebarBackgroundBrush" Color="#202024" />
+      <SolidColorBrush x:Key="CardBackgroundBrush" Color="#2A2A2F" />
+      <SolidColorBrush x:Key="GlassBrush" Color="#2E2E34" Opacity="0.88" />
+      <SolidColorBrush x:Key="FaintFillBrush" Color="#FFFFFF" Opacity="0.045" />
+      <SolidColorBrush x:Key="SubtleFillBrush" Color="#FFFFFF" Opacity="0.07" />
+      <SolidColorBrush x:Key="HoverFillBrush" Color="#FFFFFF" Opacity="0.11" />
+      <SolidColorBrush x:Key="QuaternaryFillBrush" Color="#FFFFFF" Opacity="0.10" />
+      <SolidColorBrush x:Key="BorderSoftBrush" Color="#FFFFFF" Opacity="0.12" />
+      <SolidColorBrush x:Key="BorderStrongBrush" Color="#FFFFFF" Opacity="0.24" />
+      <SolidColorBrush x:Key="PrimaryTextBrush" Color="#F2F2F5" />
+      <SolidColorBrush x:Key="SecondaryTextBrush" Color="#A9A9B2" />
+      <SolidColorBrush x:Key="TertiaryTextBrush" Color="#7C7C86" />
+      <SolidColorBrush x:Key="SeparatorBrush" Color="#FFFFFF" Opacity="0.12" />
+      <SolidColorBrush x:Key="ScrimBrush" Color="#000000" Opacity="0.45" />
+      <SolidColorBrush x:Key="OnAccentTextBrush" Color="#FFFFFF" />
+    </ResourceDictionary>
+
+  </ResourceDictionary.ThemeDictionaries>
+
+</ResourceDictionary>

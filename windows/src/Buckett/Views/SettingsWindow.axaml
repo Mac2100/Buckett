@@ -1,0 +1,373 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:Buckett.Views"
+        x:Class="Buckett.Views.SettingsWindow"
+        Title="Buckett Settings"
+        Width="720" Height="540"
+        MinWidth="640" MinHeight="480"
+        Icon="avares://Buckett/Assets/app.ico"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        WindowStartupLocation="CenterOwner">
+
+  <TabControl x:Name="Tabs" Padding="0">
+
+    <!-- Accounts -->
+    <TabItem Tag="Accounts">
+      <TabItem.Header>
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <views:Glyph Symbol="person.crop.circle" Size="14" VerticalAlignment="Center" />
+          <TextBlock Text="Accounts" VerticalAlignment="Center" />
+        </StackPanel>
+      </TabItem.Header>
+
+      <Grid ColumnDefinitions="200,Auto,*">
+        <DockPanel Grid.Column="0">
+          <Border DockPanel.Dock="Bottom" BorderThickness="0,1,0,0"
+                  BorderBrush="{DynamicResource SeparatorBrush}">
+            <StackPanel Orientation="Horizontal" Spacing="2" Margin="6">
+              <Button Classes="icon" Click="OnAddAccount" ToolTip.Tip="Add account">
+                <views:Glyph Symbol="plus" Size="13" />
+              </Button>
+              <Button x:Name="RemoveAccountButton" Classes="icon" Click="OnRemoveAccount"
+                      ToolTip.Tip="Remove account">
+                <views:Glyph Symbol="minus" Size="13" />
+              </Button>
+            </StackPanel>
+          </Border>
+          <ListBox x:Name="AccountList" Background="Transparent" BorderThickness="0">
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <views:Glyph Symbol="{Binding Symbol}" Size="14" VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding Title}" VerticalAlignment="Center"
+                             TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </DockPanel>
+
+        <Border Grid.Column="1" Width="1" Background="{DynamicResource SeparatorBrush}" />
+
+        <Panel Grid.Column="2">
+          <StackPanel x:Name="NoAccountBlock" Spacing="8" HorizontalAlignment="Center"
+                      VerticalAlignment="Center">
+            <views:Glyph Symbol="person.crop.circle.badge.questionmark" Size="36"
+                         HorizontalAlignment="Center"
+                         Foreground="{DynamicResource TertiaryTextBrush}" />
+            <TextBlock Text="Select an account, or add one with +" Classes="secondary" />
+          </StackPanel>
+
+          <ScrollViewer x:Name="EditorScroller" IsVisible="False">
+            <StackPanel Margin="18" Spacing="14">
+
+              <StackPanel Spacing="6">
+                <TextBlock Text="Display Name" Classes="callout" FontWeight="Medium" />
+                <TextBox x:Name="NameBox" />
+              </StackPanel>
+
+              <StackPanel Spacing="6">
+                <TextBlock Text="Provider" Classes="callout" FontWeight="Medium" />
+                <Border Classes="segments" HorizontalAlignment="Left">
+                  <StackPanel x:Name="ProviderHost" Orientation="Horizontal" Spacing="2" />
+                </Border>
+              </StackPanel>
+
+              <TextBlock Text="Connection" Classes="caption secondary" FontWeight="SemiBold"
+                         Margin="0,6,0,0" />
+              <StackPanel Spacing="6">
+                <TextBlock x:Name="RegionLabel" Classes="callout" FontWeight="Medium" />
+                <TextBox x:Name="RegionBox" />
+                <TextBlock x:Name="RegionHint" Classes="caption tertiary" TextWrapping="Wrap" />
+              </StackPanel>
+              <StackPanel Spacing="6">
+                <TextBlock Text="Custom Endpoint (optional)" Classes="callout"
+                           FontWeight="Medium" />
+                <TextBox x:Name="EndpointBox" />
+                <TextBlock Text="Overrides the derived endpoint. Any S3-compatible endpoint works."
+                           Classes="caption tertiary" TextWrapping="Wrap" />
+              </StackPanel>
+              <StackPanel Spacing="4">
+                <TextBlock Text="Endpoint" Classes="caption secondary" />
+                <SelectableTextBlock x:Name="ResolvedEndpoint" Classes="caption mono secondary"
+                                     TextWrapping="Wrap" />
+              </StackPanel>
+
+              <TextBlock Text="Credentials" Classes="caption secondary" FontWeight="SemiBold"
+                         Margin="0,6,0,0" />
+              <StackPanel Spacing="6">
+                <TextBlock Text="Access Key ID" Classes="callout" FontWeight="Medium" />
+                <TextBox x:Name="AccessKeyBox" />
+              </StackPanel>
+              <StackPanel Spacing="6">
+                <TextBlock Text="Secret Access Key" Classes="callout" FontWeight="Medium" />
+                <TextBox x:Name="SecretKeyBox" PasswordChar="•" />
+                <TextBlock Classes="caption tertiary" TextWrapping="Wrap"
+                           Text="Credentials are stored only in Windows Credential Manager and are used solely to sign API requests sent directly to the provider." />
+              </StackPanel>
+
+              <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,8,0,0">
+                <Button Grid.Column="0" x:Name="TestButton" Content="Test Connection"
+                        Click="OnTestConnection" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="7"
+                            Margin="12,0" VerticalAlignment="Center">
+                  <ProgressBar x:Name="TestSpinner" IsIndeterminate="True" Width="40" Height="3"
+                               VerticalAlignment="Center" IsVisible="False" />
+                  <views:Glyph x:Name="TestGlyph" Size="14" VerticalAlignment="Center"
+                               IsVisible="False" />
+                  <TextBlock x:Name="TestLabel" Classes="caption" VerticalAlignment="Center"
+                             TextWrapping="Wrap" MaxWidth="220" />
+                </StackPanel>
+                <Button Grid.Column="2" Classes="prominent" Content="Save" Click="OnSaveAccount" />
+              </Grid>
+            </StackPanel>
+          </ScrollViewer>
+        </Panel>
+      </Grid>
+    </TabItem>
+
+    <!-- Appearance -->
+    <TabItem Tag="Appearance">
+      <TabItem.Header>
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <views:Glyph Symbol="paintpalette" Size="14" VerticalAlignment="Center" />
+          <TextBlock Text="Appearance" VerticalAlignment="Center" />
+        </StackPanel>
+      </TabItem.Header>
+
+      <ScrollViewer>
+        <StackPanel Margin="20" Spacing="18">
+          <StackPanel Spacing="8">
+            <TextBlock Text="Appearance" Classes="callout" FontWeight="Medium" />
+            <Border Classes="segments" HorizontalAlignment="Left">
+              <StackPanel x:Name="AppearanceHost" Orientation="Horizontal" Spacing="2" />
+            </Border>
+          </StackPanel>
+
+          <StackPanel Spacing="8">
+            <TextBlock Text="Theme" Classes="callout" FontWeight="Medium" />
+            <ItemsControl x:Name="ThemeHost">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <UniformGrid Columns="3" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Button Classes="plain" Margin="5" Padding="0" Click="OnPickTheme">
+                    <Border CornerRadius="10" Padding="10" Background="{Binding Background}"
+                            BorderBrush="{Binding Border}" BorderThickness="1">
+                      <StackPanel Spacing="8">
+                        <Border Width="38" Height="38" CornerRadius="19"
+                                Background="{Binding Swatch}" HorizontalAlignment="Center">
+                          <views:Glyph Symbol="checkmark" Size="16" Foreground="White"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       IsVisible="{Binding IsSelected}" />
+                        </Border>
+                        <TextBlock Text="{Binding Name}" Classes="callout"
+                                   HorizontalAlignment="Center" />
+                      </StackPanel>
+                    </Border>
+                  </Button>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+
+          <StackPanel Spacing="8">
+            <TextBlock Text="Drop Target Icon" Classes="callout" FontWeight="Medium" />
+            <ItemsControl x:Name="TrayIconHost">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <UniformGrid Columns="5" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Button Classes="plain" Margin="5" Padding="0" Click="OnPickTrayIcon">
+                    <Border CornerRadius="9" Padding="9" Background="{Binding Background}"
+                            BorderBrush="{Binding Border}" BorderThickness="1">
+                      <StackPanel Spacing="6">
+                        <views:Glyph Symbol="{Binding Symbol}" Size="20"
+                                     HorizontalAlignment="Center" />
+                        <TextBlock Text="{Binding Name}" Classes="caption2"
+                                   HorizontalAlignment="Center" />
+                      </StackPanel>
+                    </Border>
+                  </Button>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Classes="caption tertiary" TextWrapping="Wrap"
+                       Text="Used for the desktop drop target, the notification-area icon, and their animations." />
+          </StackPanel>
+        </StackPanel>
+      </ScrollViewer>
+    </TabItem>
+
+    <!-- General -->
+    <TabItem Tag="General">
+      <TabItem.Header>
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <views:Glyph Symbol="gearshape" Size="14" VerticalAlignment="Center" />
+          <TextBlock Text="General" VerticalAlignment="Center" />
+        </StackPanel>
+      </TabItem.Header>
+
+      <ScrollViewer>
+        <StackPanel Margin="20" Spacing="16">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Grid.Column="0" Text="Default view" Classes="callout"
+                       VerticalAlignment="Center" />
+            <ComboBox Grid.Column="1" x:Name="DefaultViewPicker" MinWidth="140" />
+          </Grid>
+
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Grid.Column="0" Text="Concurrent transfers" Classes="callout"
+                       VerticalAlignment="Center" />
+            <NumericUpDown Grid.Column="1" x:Name="ConcurrencyStepper" Minimum="1" Maximum="8"
+                           Increment="1" FormatString="0" Width="130" />
+          </Grid>
+
+          <Border Classes="separator" />
+
+          <StackPanel Spacing="8">
+            <CheckBox x:Name="TrayIconToggle" Content="Show notification-area icon" />
+            <CheckBox x:Name="DropTargetToggle" Content="Show desktop drop target" />
+            <TextBlock Classes="caption secondary" TextWrapping="Wrap"
+                       Text="Drag files onto the floating bucket to upload them instantly. Right-click the notification-area icon to pick which buckets drops go to. (Windows notification-area icons cannot receive dropped files, so Buckett provides a movable drop target instead.)" />
+          </StackPanel>
+
+          <Border Classes="separator" />
+
+          <StackPanel Spacing="8">
+            <CheckBox x:Name="OpenAtLoginToggle" Content="Open at login" />
+            <TextBlock Classes="caption secondary" TextWrapping="Wrap"
+                       Text="Uploads of 16 MB or more automatically use resumable multipart uploads. Interrupted uploads resume from the last completed part when retried." />
+          </StackPanel>
+        </StackPanel>
+      </ScrollViewer>
+    </TabItem>
+
+    <!-- Notifications -->
+    <TabItem Tag="Notifications">
+      <TabItem.Header>
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <views:Glyph Symbol="bell.badge" Size="14" VerticalAlignment="Center" />
+          <TextBlock Text="Notifications" VerticalAlignment="Center" />
+        </StackPanel>
+      </TabItem.Header>
+
+      <ScrollViewer>
+        <StackPanel Margin="20" Spacing="14">
+          <TextBlock Text="System Notifications" Classes="caption secondary"
+                     FontWeight="SemiBold" />
+          <CheckBox x:Name="NotifyCompleteToggle" Content="All transfers finished" />
+          <CheckBox x:Name="NotifyFailedToggle" Content="A transfer fails" />
+          <CheckBox x:Name="NotifyDropToggle" Content="Drop target starts uploading" />
+          <TextBlock Classes="caption secondary" TextWrapping="Wrap"
+                     Text="Delivered through the notification-area icon, so Windows shows them in the Action Center. They are suppressed while the icon is hidden." />
+
+          <Border Classes="separator" />
+
+          <TextBlock Text="In-App" Classes="caption secondary" FontWeight="SemiBold" />
+          <CheckBox x:Name="ToastsToggle" Content="Show toast banners" />
+        </StackPanel>
+      </ScrollViewer>
+    </TabItem>
+
+    <!-- Updates -->
+    <TabItem Tag="Updates">
+      <TabItem.Header>
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <views:Glyph Symbol="arrow.down.circle" Size="14" VerticalAlignment="Center" />
+          <TextBlock Text="Updates" VerticalAlignment="Center" />
+        </StackPanel>
+      </TabItem.Header>
+
+      <ScrollViewer>
+        <StackPanel Margin="20" Spacing="14">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Grid.Column="0" Text="Current version" Classes="callout"
+                       VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" x:Name="VersionLabel" Classes="callout secondary"
+                       VerticalAlignment="Center" />
+          </Grid>
+
+          <CheckBox x:Name="AutoCheckToggle" Content="Check for updates at launch" />
+
+          <Grid ColumnDefinitions="Auto,*">
+            <Button Grid.Column="0" x:Name="CheckNowButton" Content="Check Now"
+                    Click="OnCheckUpdates" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" Margin="12,0"
+                        VerticalAlignment="Center">
+              <ProgressBar x:Name="CheckSpinner" IsIndeterminate="True" Width="40" Height="3"
+                           VerticalAlignment="Center" IsVisible="False" />
+              <views:Glyph x:Name="UpdateGlyph" Size="14" VerticalAlignment="Center"
+                           IsVisible="False" />
+              <TextBlock x:Name="UpdateStatusLabel" Classes="caption" TextWrapping="Wrap"
+                         VerticalAlignment="Center" MaxWidth="330" />
+            </StackPanel>
+          </Grid>
+
+          <Button x:Name="InstallButton" Classes="prominent" Content="Install &amp; Relaunch"
+                  HorizontalAlignment="Left" IsVisible="False" Click="OnInstallUpdate" />
+
+          <TextBlock x:Name="UpdaterPhaseLabel" Classes="caption secondary" IsVisible="False" />
+          <TextBlock x:Name="LastCheckedLabel" Classes="caption tertiary" />
+
+          <Button Classes="link" Content="View releases on GitHub" HorizontalAlignment="Left"
+                  Click="OnOpenReleases" />
+        </StackPanel>
+      </ScrollViewer>
+    </TabItem>
+
+    <!-- About -->
+    <TabItem Tag="About">
+      <TabItem.Header>
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <views:Glyph Symbol="info.circle" Size="14" VerticalAlignment="Center" />
+          <TextBlock Text="About" VerticalAlignment="Center" />
+        </StackPanel>
+      </TabItem.Header>
+
+      <StackPanel Spacing="12" HorizontalAlignment="Center" VerticalAlignment="Center">
+        <views:AppGlyph GlyphSize="64" HorizontalAlignment="Center" />
+        <TextBlock Text="Buckett" Classes="title" HorizontalAlignment="Center" />
+        <TextBlock x:Name="AboutVersion" Classes="secondary" HorizontalAlignment="Center" />
+        <TextBlock Classes="callout secondary" TextAlignment="Center"
+                   Text="An open-source visual bucket explorer for&#10;Cloudflare R2 and Backblaze B2." />
+        <StackPanel Orientation="Horizontal" Spacing="16" HorizontalAlignment="Center">
+          <Button Classes="link" Content="GitHub" Click="OnOpenRepo" />
+          <Button Classes="link" Content="Releases" Click="OnOpenReleases" />
+          <Button Classes="link" Content="MIT License" Click="OnOpenLicense" />
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center"
+                    Margin="0,8,0,0">
+          <Button Classes="plain" Click="OnBuyCoffee">
+            <Border Background="#FFDD00" CornerRadius="18" Padding="16,9">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <views:Glyph Symbol="cup.and.saucer.fill" Size="15" Foreground="Black"
+                             VerticalAlignment="Center" />
+                <TextBlock Text="Buy Me a Coffee" Foreground="Black" FontWeight="SemiBold"
+                           VerticalAlignment="Center" />
+              </StackPanel>
+            </Border>
+          </Button>
+          <Button Classes="plain" Click="OnOpenRepo">
+            <Border Background="{DynamicResource QuaternaryFillBrush}" CornerRadius="18"
+                    Padding="16,9" BorderBrush="{DynamicResource BorderSoftBrush}"
+                    BorderThickness="1">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <views:Glyph Symbol="star.fill" Size="15" VerticalAlignment="Center" />
+                <TextBlock Text="Star on GitHub" FontWeight="SemiBold"
+                           VerticalAlignment="Center" />
+              </StackPanel>
+            </Border>
+          </Button>
+        </StackPanel>
+      </StackPanel>
+    </TabItem>
+
+  </TabControl>
+</Window>

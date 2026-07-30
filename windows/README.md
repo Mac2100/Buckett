@@ -1,0 +1,125 @@
+# Buckett for Windows
+
+A native Windows port of [Buckett](../README.md) — the open-source bucket explorer for
+**Cloudflare R2** and **Backblaze B2** (and any other S3-compatible storage).
+
+Same look, same workflows, same feature set as the macOS app, rebuilt on .NET 8 and
+[Avalonia](https://avaloniaui.net/) so it renders and behaves like a Windows application.
+
+![Buckett icon](../Resources/icon_1024.png)
+
+## Installation
+
+### Download
+
+Grab `Buckett-x.y.z-win-x64.zip` from [Releases](https://github.com/Mac2100/Buckett/releases),
+unzip it anywhere you can write to (for example `%LOCALAPPDATA%\Programs\Buckett`), and run
+`Buckett.exe`. The build is self-contained — no .NET install required.
+
+> **Note on SmartScreen:** releases are unsigned (no paid code-signing certificate), so the
+> first launch shows "Windows protected your PC". Click **More info → Run anyway**.
+
+> **Where to unzip matters for updates:** the in-app updater replaces the files in place, so
+> put Buckett somewhere your user account can write. A folder under `Program Files` needs
+> administrator rights and the updater will tell you so rather than failing silently.
+
+### Build from source
+
+Requires the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) on Windows 10
+1809 or later.
+
+```powershell
+git clone https://github.com/Mac2100/Buckett.git
+cd Buckett
+./windows/build/make_app.ps1     # produces windows/dist/Buckett/ and the release ZIP
+```
+
+For development, `dotnet run --project windows/src/Buckett` works directly, or open
+`windows/Buckett.sln` in Visual Studio / Rider.
+
+## Setting up an account
+
+Open **Settings → Accounts** (from the sidebar footer) or run the guided wizard from
+**Add Account…**:
+
+### Cloudflare R2
+
+1. In the Cloudflare dashboard, go to **R2 → Manage R2 API Tokens** and create a token with
+   *Object Read & Write* (or *Admin Read & Write* if you want to create/delete buckets from
+   the app).
+2. Copy the **Access Key ID** and **Secret Access Key** into Buckett.
+3. Enter your **Cloudflare Account ID** (shown on the R2 overview page). The endpoint
+   `https://<account-id>.r2.cloudflarestorage.com` is derived automatically.
+
+### Backblaze B2
+
+1. In the Backblaze console, go to **App Keys** and create a key.
+2. Copy the **keyID** (Access Key ID) and **applicationKey** (Secret Access Key).
+3. Enter your **region** — the part after `s3.` in your bucket's S3 endpoint, e.g.
+   `us-west-004` for `s3.us-west-004.backblazeb2.com`.
+
+Any other S3-compatible service (AWS S3, MinIO, Wasabi, …) works too via the
+**Custom Endpoint** field. Use **Test Connection** to verify credentials before saving.
+
+## Security & privacy
+
+- Secret access keys are stored **only** in the Windows Credential Manager (encrypted at rest
+  by the OS under your user account), never in plain files or preferences.
+- All requests are signed locally (AWS Signature V4) and sent **directly** to your storage
+  provider over HTTPS — there is no intermediary server.
+- The only other network request the app ever makes is the (optional, off-switchable) update
+  check against the public GitHub Releases API.
+
+Non-secret data lives in `%APPDATA%\Buckett`: `accounts.json`, `settings.json`,
+`bucket-aliases.json`, `upload-history.json`, and upload checkpoints under `resumable\`.
+The `accounts.json` format is identical to the macOS build's.
+
+## How the platform pieces map
+
+Everything in the macOS feature list is present. Five things are implemented differently
+because Windows works differently:
+
+| macOS | Windows |
+| --- | --- |
+| Keychain | Windows Credential Manager (`CredRead`/`CredWrite`, DPAPI-encrypted) |
+| Menu bar icon accepts dropped files | Windows notification-area icons **cannot** receive drops, so Buckett shows a small always-on-top **desktop drop target** you can drag anywhere. It has the same hover panel of bucket drop zones and the same drop animation. The notification-area icon keeps the menu (open, pick drop buckets, active transfers, quit) and carries notifications. |
+| Quick Look previews | Images and text/code preview in-window; anything else (video, audio, PDF, Office…) opens in your default Windows application from the same preview window |
+| Notification Center | Notification-area balloons, which Windows 10/11 route into the Action Center |
+| DMG + in-place `.app` swap | Portable ZIP; the updater downloads it, waits for Buckett to exit, swaps the install folder, and relaunches |
+
+Two smaller differences: the macOS file picker can select files *and* folders at once, so the
+**Upload** button offers "Upload Files…" and "Upload Folders…" separately (drag & drop still
+takes both together); and Windows popup menus close on click, so the drop-bucket checkboxes
+are toggled one visit at a time.
+
+## CI / Releases
+
+`.github/workflows/build-windows.yml` builds the app on every push and pull request and
+uploads the ZIP as an artifact. Pushing a tag like `v1.2.0` additionally attaches the ZIP to
+the GitHub Release — which is what the in-app update checker looks at.
+
+To cut a release: bump `AppVersion.Marketing` in
+`windows/src/Buckett/Support/AppVersion.cs` (and the matching `<Version>` in
+`Buckett.csproj`), then tag the commit `v<version>` and push the tag.
+
+## Project layout
+
+```
+windows/
+  Buckett.sln
+  build/make_app.ps1            # publish + ZIP
+  src/Buckett/
+    Models/                     # Account, RemoteObject, BucketStats, byte formatting
+    Services/                   # SigV4, S3 client, transfers, credentials, updates, tray
+    ViewModels/                 # AppState, BrowserModel, ObjectItem
+    Views/                      # Windows, controls, icon set, theme
+    App/                        # Notification-area controller
+```
+
+The Swift and C# sources are deliberately kept structurally parallel — the same file names,
+the same `// MARK:` section markers, and the same method names — so a change on one platform
+is easy to mirror on the other.
+
+## License
+
+[MIT](../LICENSE)

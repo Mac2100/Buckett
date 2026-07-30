@@ -1,0 +1,54 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:Buckett.Views"
+             x:Class="Buckett.Views.WelcomeView">
+
+  <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
+              MaxWidth="800" Spacing="0">
+
+    <views:AppGlyph GlyphSize="84" HorizontalAlignment="Center" Margin="0,0,0,22" />
+
+    <TextBlock Text="Welcome to Buckett" FontSize="34" FontWeight="Bold"
+               HorizontalAlignment="Center" />
+    <TextBlock Classes="secondary" FontSize="16" TextAlignment="Center" Margin="0,6,0,0"
+               Text="Start your cloud storage journey — browse and manage&#10;Cloudflare R2 and Backblaze B2 buckets, natively." />
+
+    <UniformGrid Columns="3" Margin="40,34,40,0">
+      <Border Classes="card" Margin="7" Padding="14" Height="132">
+        <StackPanel Spacing="10" VerticalAlignment="Center">
+          <views:Glyph Symbol="arrow.up.arrow.down.circle.fill" Size="26"
+                       HorizontalAlignment="Center"
+                       Foreground="{DynamicResource ThemePrimaryBrush}" />
+          <TextBlock Text="Fast Transfers" Classes="headline" HorizontalAlignment="Center" />
+          <TextBlock Text="Drag &amp; drop uploads with resumable multipart support"
+                     Classes="caption secondary" TextAlignment="Center" TextWrapping="Wrap" />
+        </StackPanel>
+      </Border>
+      <Border Classes="card" Margin="7" Padding="14" Height="132">
+        <StackPanel Spacing="10" VerticalAlignment="Center">
+          <views:Glyph Symbol="lock.shield.fill" Size="26" HorizontalAlignment="Center"
+                       Foreground="{DynamicResource ThemePrimaryBrush}" />
+          <TextBlock Text="Private by Design" Classes="headline" HorizontalAlignment="Center" />
+          <TextBlock Text="Keys live in Windows Credential Manager; requests go straight to your provider"
+                     Classes="caption secondary" TextAlignment="Center" TextWrapping="Wrap" />
+        </StackPanel>
+      </Border>
+      <Border Classes="card" Margin="7" Padding="14" Height="132">
+        <StackPanel Spacing="10" VerticalAlignment="Center">
+          <views:Glyph Symbol="square.grid.2x2.fill" Size="26" HorizontalAlignment="Center"
+                       Foreground="{DynamicResource ThemePrimaryBrush}" />
+          <TextBlock Text="Simple Management" Classes="headline" HorizontalAlignment="Center" />
+          <TextBlock Text="Previews, batch actions, and per-bucket statistics"
+                     Classes="caption secondary" TextAlignment="Center" TextWrapping="Wrap" />
+        </StackPanel>
+      </Border>
+    </UniformGrid>
+
+    <Button Classes="prominent" HorizontalAlignment="Center" Margin="0,36,0,0"
+            Padding="20,10" FontSize="15" Click="OnAddAccount"
+            Content="Add Your First Account" />
+
+    <TextBlock Text="Just a few steps to get started" Classes="callout tertiary"
+               HorizontalAlignment="Center" Margin="0,10,0,0" />
+  </StackPanel>
+</UserControl>

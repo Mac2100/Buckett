@@ -1,0 +1,135 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:Buckett.Views"
+             x:Class="Buckett.Views.DashboardView">
+
+  <ScrollViewer>
+    <StackPanel Margin="20" Spacing="20">
+
+      <StackPanel Spacing="4">
+        <TextBlock x:Name="HeaderTitle" Classes="largeTitle" />
+        <TextBlock x:Name="HeaderSubtitle" Classes="secondary" />
+      </StackPanel>
+
+      <UniformGrid x:Name="SummaryRow" Columns="3" IsVisible="False">
+        <Border Background="{DynamicResource SubtleFillBrush}" CornerRadius="10"
+                Padding="14" Margin="0,0,8,0">
+          <StackPanel Orientation="Horizontal" Spacing="12">
+            <views:Glyph Symbol="externaldrive.fill" Size="21" Width="32"
+                         VerticalAlignment="Center"
+                         Foreground="{DynamicResource ThemePrimaryBrush}" />
+            <StackPanel VerticalAlignment="Center" Spacing="2">
+              <TextBlock x:Name="SummaryStorage" Classes="title3 digits" />
+              <TextBlock Text="Analyzed Storage" Classes="caption secondary" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+        <Border Background="{DynamicResource SubtleFillBrush}" CornerRadius="10"
+                Padding="14" Margin="8,0">
+          <StackPanel Orientation="Horizontal" Spacing="12">
+            <views:Glyph Symbol="doc.on.doc.fill" Size="21" Width="32" VerticalAlignment="Center"
+                         Foreground="{DynamicResource ThemePrimaryBrush}" />
+            <StackPanel VerticalAlignment="Center" Spacing="2">
+              <TextBlock x:Name="SummaryObjects" Classes="title3 digits" />
+              <TextBlock Text="Objects" Classes="caption secondary" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+        <Border Background="{DynamicResource SubtleFillBrush}" CornerRadius="10"
+                Padding="14" Margin="8,0,0,0">
+          <StackPanel Orientation="Horizontal" Spacing="12">
+            <views:Glyph Symbol="tray.2.fill" Size="21" Width="32" VerticalAlignment="Center"
+                         Foreground="{DynamicResource ThemePrimaryBrush}" />
+            <StackPanel VerticalAlignment="Center" Spacing="2">
+              <TextBlock x:Name="SummaryAnalyzed" Classes="title3 digits" />
+              <TextBlock Text="Buckets Analyzed" Classes="caption secondary" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+      </UniformGrid>
+
+      <ItemsControl x:Name="Host">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <StackPanel Spacing="12" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <Panel>
+
+              <!-- Account heading (All Accounts mode) -->
+              <StackPanel Orientation="Horizontal" Spacing="7" Margin="0,6,0,0"
+                          IsVisible="{Binding IsHeading}">
+                <views:Glyph Symbol="{Binding Symbol}" Size="15" VerticalAlignment="Center"
+                             Foreground="{DynamicResource SecondaryTextBrush}" />
+                <TextBlock Text="{Binding Title}" Classes="title3" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding Subtitle}" Classes="callout tertiary"
+                           VerticalAlignment="Center" />
+              </StackPanel>
+
+              <TextBlock Text="{Binding Title}" Classes="callout tertiary"
+                         IsVisible="{Binding IsPlaceholder}" />
+
+              <Border Classes="panel" Padding="16" IsVisible="{Binding IsBucket}">
+                <StackPanel Spacing="10">
+                  <Grid ColumnDefinitions="Auto,*,Auto">
+                    <views:Glyph Grid.Column="0" Symbol="tray.full" Size="15"
+                                 VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <TextBlock Grid.Column="1" Text="{Binding Title}" Classes="headline"
+                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                    <Button Grid.Column="2" Content="Browse" Padding="10,4"
+                            Click="OnBrowse" />
+                  </Grid>
+
+                  <StackPanel Orientation="Horizontal" Spacing="16"
+                              IsVisible="{Binding HasStats}">
+                    <StackPanel Spacing="1">
+                      <TextBlock Text="{Binding SizeText}" Classes="callout digits"
+                                 FontWeight="SemiBold" />
+                      <TextBlock Text="Total size" Classes="caption2 secondary" />
+                    </StackPanel>
+                    <StackPanel Spacing="1">
+                      <TextBlock Text="{Binding ObjectsText}" Classes="callout digits"
+                                 FontWeight="SemiBold" />
+                      <TextBlock Text="Objects" Classes="caption2 secondary" />
+                    </StackPanel>
+                    <StackPanel Spacing="1" IsVisible="{Binding HasLastChange}">
+                      <TextBlock Text="{Binding LastChangeText}" Classes="callout"
+                                 FontWeight="SemiBold" />
+                      <TextBlock Text="Last change" Classes="caption2 secondary" />
+                    </StackPanel>
+                  </StackPanel>
+
+                  <views:BarChart Bars="{Binding Bars}" RowHeight="24"
+                                  IsVisible="{Binding HasBars}" />
+
+                  <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasStats}">
+                    <TextBlock Grid.Column="0" Text="{Binding AnalyzedText}"
+                               Classes="caption2 tertiary" VerticalAlignment="Center" />
+                    <Button Grid.Column="1" Content="Re-analyze" Padding="10,4"
+                            IsEnabled="{Binding CanAnalyze}" Click="OnAnalyze" />
+                  </Grid>
+
+                  <StackPanel Orientation="Horizontal" Spacing="10"
+                              IsVisible="{Binding ShowNoData}">
+                    <ProgressBar IsIndeterminate="True" Width="60" Height="3"
+                                 VerticalAlignment="Center"
+                                 IsVisible="{Binding IsAnalyzing}" />
+                    <TextBlock Text="{Binding NoDataText}" Classes="callout secondary"
+                               VerticalAlignment="Center" />
+                    <Button Content="Analyze" Padding="10,4" Click="OnAnalyze"
+                            IsVisible="{Binding CanAnalyze}" />
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+            </Panel>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <TextBlock x:Name="NoBucketsLabel" Text="No buckets found." Classes="secondary"
+                 IsVisible="False" />
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>
