@@ -15,6 +15,10 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
+        // A 1280x820 window does not fit an 800-tall laptop panel, and Avalonia
+        // would centre it anyway — title bar above the top of the screen.
+        this.KeepOnScreen();
+
         ClipboardService.Register(this);
         Panels.Register(this);
 
@@ -36,10 +40,15 @@ public partial class MainWindow : Window
     /// notification area; the window comes back from the tray menu or the
     /// desktop drop target. With both of those turned off there would be no way
     /// back, so then the close really does quit.
+    ///
+    /// Only the user clicking the close button gets that treatment. Windows
+    /// logging off, or an installer's restart manager asking the app to go
+    /// away, must be obeyed: refusing left Buckett running — drop target still
+    /// floating on the desktop — after it had supposedly been uninstalled.
     protected override void OnClosing(WindowClosingEventArgs e)
     {
         var hasWayBack = Settings.Shared.ShowTrayIcon || Settings.Shared.ShowDropTarget;
-        if (!App.IsShuttingDown && hasWayBack)
+        if (ShouldHideToTray(e.CloseReason, App.IsShuttingDown, hasWayBack))
         {
             e.Cancel = true;
             Hide();
@@ -54,6 +63,16 @@ public partial class MainWindow : Window
             desktop.Shutdown();
         }
     }
+
+    /// The one case that hides instead of quitting: the user clicked the close
+    /// button and there is still a way to get the window back. Everything else
+    /// — the tray's Quit item, the updater restarting the app, Windows logging
+    /// off, an installer's restart manager clearing the way for an uninstall —
+    /// is a real request to go away, and cancelling it left Buckett resident
+    /// with no window and, after an uninstall, no executable on disk.
+    internal static bool ShouldHideToTray(
+        WindowCloseReason reason, bool shuttingDown, bool hasWayBack) =>
+        !shuttingDown && hasWayBack && reason == WindowCloseReason.WindowClosing;
 
     private void OnStatePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -106,6 +125,8 @@ public partial class MainWindow : Window
     {
         Show();
         if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+        // The display layout may have changed while the window sat in the tray.
+        this.EnsureOnScreen();
         Activate();
         Topmost = true;
         Topmost = false;

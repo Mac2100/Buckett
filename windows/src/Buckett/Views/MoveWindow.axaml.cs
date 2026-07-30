@@ -38,6 +38,7 @@ public partial class MoveWindow : Window
     {
         _model = model;
         InitializeComponent();
+        this.KeepOnScreen();
 
         CrumbHost.ItemsSource = _crumbs;
         BuildStrategyOptions();

@@ -20,6 +20,7 @@ public partial class MetadataWindow : Window
         _object = remote;
         _model = model;
         InitializeComponent();
+        this.KeepOnScreen();
         _ = LoadAsync();
     }
 

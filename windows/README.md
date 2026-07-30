@@ -102,6 +102,7 @@ because Windows works differently:
 | Quick Look previews | Images and text/code preview in-window; anything else (video, audio, PDF, Office…) opens in your default Windows application from the same preview window |
 | Notification Center | Notification-area balloons, which Windows 10/11 route into the Action Center |
 | DMG + in-place `.app` swap | Portable ZIP; the updater downloads it, waits for Buckett to exit, swaps the install folder, and relaunches |
+| macOS launches one instance of an app | Windows does not, so Buckett holds a named mutex: a second launch brings the running window forward and exits. Setup and uninstall watch that same mutex, so neither runs behind Buckett's back and leaves it resident. |
 
 Two smaller differences: the macOS file picker can select files *and* folders at once, so the
 **Upload** button offers "Upload Files…" and "Upload Folders…" separately (drag & drop still

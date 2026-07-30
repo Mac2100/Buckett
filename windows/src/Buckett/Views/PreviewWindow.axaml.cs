@@ -31,6 +31,7 @@ public partial class PreviewWindow : Window
         _client = client;
 
         InitializeComponent();
+        this.KeepOnScreen();
 
         Title = remote.Name;
         HeaderGlyph.Symbol = remote.SymbolName;

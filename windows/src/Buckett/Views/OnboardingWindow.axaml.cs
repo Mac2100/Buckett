@@ -38,6 +38,7 @@ public partial class OnboardingWindow : Window
     public OnboardingWindow()
     {
         InitializeComponent();
+        this.KeepOnScreen();
 
         NameBox.TextChanged += (_, _) => Sync();
         RegionBox.TextChanged += (_, _) => Sync();

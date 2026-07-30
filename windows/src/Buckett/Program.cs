@@ -27,6 +27,11 @@ internal static class Program
             e.SetObserved();
         };
 
+        // A second launch just brings the running copy forward. Doing this
+        // before Avalonia starts keeps the duplicate from ever drawing a tray
+        // icon or a drop target.
+        if (!SingleInstance.TryAcquire()) return;
+
         try
         {
             BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);

@@ -45,6 +45,10 @@ WizardStyle=modern
 ; upgrade; let the restart manager close it rather than failing on locked files.
 CloseApplications=yes
 RestartApplications=no
+; Must match SingleInstance.cs. Without this, setup and — worse — uninstall
+; happily ran while Buckett was still going, leaving the app resident with its
+; drop target on screen after the user had removed it.
+AppMutex=Buckett.SingleInstance,Global\Buckett.SingleInstance
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -61,6 +65,15 @@ Name: "{autodesktop}\Buckett"; Filename: "{app}\Buckett.exe"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\Buckett.exe"; Description: "Launch Buckett"; Flags: nowait postinstall skipifsilent
+
+[UninstallRun]
+; AppMutex asks the user to close Buckett first, and the restart manager has a
+; go at it too. This is the backstop for the case that produced the bug report:
+; the app still resident after an uninstall, tray icon and desktop drop target
+; included, with the executable already deleted from under it. Runs before any
+; files are removed. Buckett holds no unsaved documents, so there is nothing to
+; lose by being firm about it.
+Filename: "{sys}\taskkill.exe"; Parameters: "/IM Buckett.exe /F"; Flags: runhidden skipifdoesntexist; RunOnceId: "StopBuckett"
 
 [UninstallDelete]
 ; The updater's staging area, if an update was interrupted. Account data in

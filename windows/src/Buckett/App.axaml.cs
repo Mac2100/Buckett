@@ -34,6 +34,7 @@ public partial class App : Application
             desktop.MainWindow = _mainWindow;
 
             AppState.Shared.OpenMainWindowRequested += RevealMainWindow;
+            SingleInstance.ListenForReveal(RevealMainWindow);
 
             desktop.Exit += (_, _) =>
             {

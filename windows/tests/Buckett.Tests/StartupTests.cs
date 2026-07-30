@@ -42,7 +42,8 @@ public class StartupTests
             typeof(ThumbnailLoader),
             typeof(AppState),
             typeof(Icons),
-            typeof(NaturalComparer)
+            typeof(NaturalComparer),
+            typeof(SingleInstance)
         }.Select(type => new object[] { type });
 
     [Theory]
