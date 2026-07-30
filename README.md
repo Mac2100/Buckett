@@ -31,7 +31,7 @@ Buckett is a free, open alternative to paid closed-source R2 clients: your crede
 ## Installation
 
 > **On Windows?** See **[windows/README.md](windows/README.md)** for the Windows build —
-> same features, same design, packaged as a portable ZIP.
+> same features, same design, available as an installer or a portable ZIP.
 
 ### Download
 
@@ -82,9 +82,14 @@ Use **Test Connection** to verify credentials before saving.
 
 ## CI / Releases
 
-Every push and pull request builds the app and uploads a DMG artifact via GitHub Actions (and, in a parallel workflow, a Windows ZIP). Pushing a tag like `v1.2.0` additionally creates a GitHub Release with both attached — which is what the in-app update checker looks at.
+A single workflow builds both platforms on every push and pull request, uploading a macOS DMG and
+a Windows ZIP + installer as artifacts. Pushing a tag like `v1.2.0` additionally creates one GitHub
+Release with all of them attached — which is what the in-app update checkers look at.
 
-To cut a release: bump `AppVersion.marketing` in `Sources/Buckett/Support/AppVersion.swift`, then tag the commit `v<version>` and push the tag.
+To cut a release: set the same version in `Sources/Buckett/Support/AppVersion.swift` (`marketing`),
+`windows/src/Buckett/Support/AppVersion.cs` (`Marketing`), and `windows/src/Buckett/Buckett.csproj`
+(`<Version>`), then tag the commit `v<version>` and push the tag. CI fails the build if the three
+disagree, or if the tag doesn't match them.
 
 ## Support
 

@@ -12,16 +12,28 @@ Same look, same workflows, same feature set as the macOS app, rebuilt on .NET 8 
 
 ### Download
 
-Grab `Buckett-x.y.z-win-x64.zip` from [Releases](https://github.com/Mac2100/Buckett/releases),
-unzip it anywhere you can write to (for example `%LOCALAPPDATA%\Programs\Buckett`), and run
-`Buckett.exe`. The build is self-contained — no .NET install required.
+Every release carries two Windows downloads. Both contain the same app, which is
+self-contained — no .NET install required.
+
+**`Buckett-Setup-x.y.z.exe`** — the installer, and the one to pick if you're unsure. It
+installs per user into `%LOCALAPPDATA%\Programs\Buckett`, adds a Start-menu entry (and
+optionally a desktop shortcut), and registers an uninstaller. No administrator rights, no
+UAC prompt.
+
+**`Buckett-x.y.z-win-x64.zip`** — the portable build. Unzip anywhere you can write to and run
+`Buckett.exe`. This is also the asset the in-app updater downloads.
 
 > **Note on SmartScreen:** releases are unsigned (no paid code-signing certificate), so the
 > first launch shows "Windows protected your PC". Click **More info → Run anyway**.
 
-> **Where to unzip matters for updates:** the in-app updater replaces the files in place, so
-> put Buckett somewhere your user account can write. A folder under `Program Files` needs
-> administrator rights and the updater will tell you so rather than failing silently.
+> **Why a per-user install:** the in-app updater replaces the app's files in place, which
+> needs a writable folder. Installing under `Program Files` would demand administrator rights
+> for every update, so the installer defaults to your user profile instead. If you move
+> Buckett somewhere unwritable, the updater says so rather than failing silently.
+>
+> One consequence worth knowing: after the app updates itself, the version listed in
+> **Apps & features** still shows whatever the installer put there. The app's own About tab
+> is the accurate one. Running a newer installer resyncs it.
 
 ### Build from source
 
@@ -31,8 +43,12 @@ Requires the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) on W
 ```powershell
 git clone https://github.com/Mac2100/Buckett.git
 cd Buckett
-./windows/build/make_app.ps1     # produces windows/dist/Buckett/ and the release ZIP
+./windows/build/make_app.ps1                 # app folder + ZIP + installer
+./windows/build/make_app.ps1 -NoInstaller    # skip the installer (no Inno Setup needed)
 ```
+
+The installer step needs [Inno Setup 6](https://jrsoftware.org/isinfo.php)
+(`choco install innosetup`); everything else needs only the .NET SDK.
 
 For development, `dotnet run --project windows/src/Buckett` works directly, or open
 `windows/Buckett.sln` in Visual Studio / Rider.
@@ -94,13 +110,25 @@ are toggled one visit at a time.
 
 ## CI / Releases
 
-`.github/workflows/build-windows.yml` builds the app on every push and pull request and
-uploads the ZIP as an artifact. Pushing a tag like `v1.2.0` additionally attaches the ZIP to
-the GitHub Release — which is what the in-app update checker looks at.
+One workflow, `.github/workflows/build.yml`, covers both platforms:
 
-To cut a release: bump `AppVersion.Marketing` in
-`windows/src/Buckett/Support/AppVersion.cs` (and the matching `<Version>` in
-`Buckett.csproj`), then tag the commit `v<version>` and push the tag.
+1. **Check version** — reads the version constant from all three places it lives and fails
+   the build if they disagree, so macOS and Windows can never ship under different numbers.
+   On a tag, it also checks the tag matches.
+2. **Build macOS** and **Build Windows** run in parallel, producing the DMG, the ZIP, and the
+   installer. The Windows job runs the test suite first.
+3. **Publish release** runs only for a `v*` tag (or a manual dispatch with *release* ticked)
+   and attaches all three files to a single GitHub Release — which is what both in-app update
+   checkers read.
+
+To cut a release, set the same version in all three files:
+
+- `Sources/Buckett/Support/AppVersion.swift` — `marketing`
+- `windows/src/Buckett/Support/AppVersion.cs` — `Marketing`
+- `windows/src/Buckett/Buckett.csproj` — `<Version>`
+
+then tag the commit `v<version>` and push the tag. The macOS app picks the `.dmg` off that
+release and the Windows app picks the `.zip`; neither can see the other's asset.
 
 ## Project layout
 
