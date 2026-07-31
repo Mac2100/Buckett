@@ -2,7 +2,7 @@
 
 [![Star on GitHub](https://img.shields.io/github/stars/Mac2100/Buckett?style=flat&logo=github&label=Star)](https://github.com/Mac2100/Buckett)
 
-An open-source, native macOS bucket explorer for **Cloudflare R2** and **Backblaze B2** (and any other S3-compatible storage), built with SwiftUI.
+An open-source, native bucket explorer for **Cloudflare R2** and **Backblaze B2** (and any other S3-compatible storage) — SwiftUI on macOS, and a matching **[Windows version](windows/README.md)** built on .NET 8 + Avalonia.
 
 Buckett is a free, open alternative to paid closed-source R2 clients: your credentials stay in your macOS Keychain, every API request goes directly from your Mac to your storage provider, and you can read every line of code that touches them.
 
@@ -29,6 +29,9 @@ Buckett is a free, open alternative to paid closed-source R2 clients: your crede
 - **Menu bar drop target** — drag files onto the bucket icon in the menu bar to upload them instantly (with a little drop-into-the-bucket animation); pick the target bucket from the icon's menu.
 
 ## Installation
+
+> **On Windows?** See **[windows/README.md](windows/README.md)** for the Windows build —
+> same features, same design, available as an installer or a portable ZIP.
 
 ### Download
 
@@ -79,9 +82,14 @@ Use **Test Connection** to verify credentials before saving.
 
 ## CI / Releases
 
-Every push and pull request builds the app and uploads a DMG artifact via GitHub Actions. Pushing a tag like `v1.2.0` additionally creates a GitHub Release with the DMG attached — which is what the in-app update checker looks at.
+A single workflow builds both platforms on every push and pull request, uploading a macOS DMG and
+a Windows ZIP + installer as artifacts. Pushing a tag like `v1.2.0` additionally creates one GitHub
+Release with all of them attached — which is what the in-app update checkers look at.
 
-To cut a release: bump `AppVersion.marketing` in `Sources/Buckett/Support/AppVersion.swift`, then tag the commit `v<version>` and push the tag.
+To cut a release: set the same version in `Sources/Buckett/Support/AppVersion.swift` (`marketing`),
+`windows/src/Buckett/Support/AppVersion.cs` (`Marketing`), and `windows/src/Buckett/Buckett.csproj`
+(`<Version>`), then tag the commit `v<version>` and push the tag. CI fails the build if the three
+disagree, or if the tag doesn't match them.
 
 ## Support
 

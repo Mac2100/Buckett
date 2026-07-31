@@ -17,8 +17,54 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  version:
+    name: Check version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.read.outputs.version }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      # macOS and Windows each carry their own version constant. If they ever
+      # drift, the two apps report different versions and their update checks
+      # compare against the wrong baseline — so a mismatch fails the build.
+      - name: Read and compare versions
+        id: read
+        run: |
+          swift=$(sed -n 's/.*marketing = "\([^"]*\)".*/\1/p' Sources/Buckett/Support/AppVersion.swift)
+          csharp=$(sed -n 's/.*Marketing = "\([^"]*\)".*/\1/p' windows/src/Buckett/Support/AppVersion.cs)
+          csproj=$(sed -n 's|.*<Version>\([^<]*\)</Version>.*|\1|p' windows/src/Buckett/Buckett.csproj)
+
+          echo "macOS  (AppVersion.swift): ${swift:-<not found>}"
+          echo "Windows (AppVersion.cs):   ${csharp:-<not found>}"
+          echo "Windows (Buckett.csproj):  ${csproj:-<not found>}"
+
+          if [ -z "$swift" ] || [ -z "$csharp" ] || [ -z "$csproj" ]; then
+            echo "::error::Could not read one of the version constants."
+            exit 1
+          fi
+          if [ "$swift" != "$csharp" ] || [ "$swift" != "$csproj" ]; then
+            echo "::error::Version mismatch. Set the same version in Sources/Buckett/Support/AppVersion.swift, windows/src/Buckett/Support/AppVersion.cs, and windows/src/Buckett/Buckett.csproj."
+            exit 1
+          fi
+
+          echo "version=${swift}" >> "$GITHUB_OUTPUT"
+
+      # A tag must match the version in the source, or the release would be
+      # labelled with one number and contain another.
+      - name: Check the tag matches
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$tag" != "${{ steps.read.outputs.version }}" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match app version ${{ steps.read.outputs.version }}."
+            exit 1
+          fi
+
+  macos:
     name: Build macOS app + DMG
+    needs: version
     runs-on: macos-14
     steps:
       - name: Check out
@@ -33,12 +79,6 @@ jobs:
       - name: Build app and DMG
         run: ./scripts/make_app.sh
 
-      - name: Read app version
-        id: version
-        run: |
-          version=$(sed -n 's/.*marketing = "\([^"]*\)".*/\1/p' Sources/Buckett/Support/AppVersion.swift)
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
-
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
         with:
@@ -46,12 +86,66 @@ jobs:
           path: dist/*.dmg
           if-no-files-found: error
 
+  windows:
+    name: Build Windows app + ZIP + installer
+    needs: version
+    runs-on: windows-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Show toolchain
+        run: dotnet --info
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Test
+        run: dotnet test windows/tests/Buckett.Tests/Buckett.Tests.csproj --configuration Release
+
+      - name: Build app, ZIP and installer
+        shell: pwsh
+        run: ./windows/build/make_app.ps1
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Buckett-windows
+          path: |
+            windows/dist/*.zip
+            windows/dist/*.exe
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: [version, macos, windows]
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release)
+    runs-on: ubuntu-latest
+    steps:
+      # A single release step owns the release, so a tag always produces one
+      # release carrying every platform's assets.
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List assets
+        run: find artifacts -type f -printf '%p (%s bytes)\n'
+
       - name: Create release
-        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release)
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.dmg
+          files: |
+            artifacts/Buckett-dmg/*.dmg
+            artifacts/Buckett-windows/*.zip
+            artifacts/Buckett-windows/*.exe
           generate_release_notes: true
+          fail_on_unmatched_files: true
           # On tag pushes, release under that tag; on manual dispatch, create
           # the tag v<app version> at the built commit.
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', steps.version.outputs.version) }}
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', needs.version.outputs.version) }}

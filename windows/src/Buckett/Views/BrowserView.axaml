@@ -1,0 +1,338 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:Buckett.Views"
+             x:Class="Buckett.Views.BrowserView"
+             DragDrop.AllowDrop="True">
+
+  <DockPanel>
+
+    <!-- Controls bar -->
+    <Border DockPanel.Dock="Top" BorderThickness="0,0,0,1"
+            BorderBrush="{DynamicResource SeparatorBrush}">
+      <Grid ColumnDefinitions="Auto,*,Auto" Margin="14,9">
+
+        <!-- Breadcrumb -->
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4">
+          <Button x:Name="UpButton" Classes="icon" Click="OnNavigateUp" ToolTip.Tip="Up one level">
+            <views:Glyph Symbol="chevron.up" Size="13" />
+          </Button>
+          <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
+                        MaxWidth="330">
+            <ItemsControl x:Name="Breadcrumbs">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <StackPanel Orientation="Horizontal" Spacing="3" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <StackPanel Orientation="Horizontal" Spacing="3">
+                    <views:Glyph Symbol="chevron.right" Size="9" VerticalAlignment="Center"
+                                 Foreground="{DynamicResource TertiaryTextBrush}"
+                                 IsVisible="{Binding ShowChevron}" />
+                    <Button Classes="link" Click="OnBreadcrumbClicked"
+                            FontWeight="{Binding Weight}"
+                            Foreground="{DynamicResource PrimaryTextBrush}"
+                            Content="{Binding Title}" />
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </StackPanel>
+
+        <!-- Right-hand controls -->
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10">
+
+          <Border Classes="searchField" Width="200" VerticalAlignment="Center">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <views:Glyph Grid.Column="0" Symbol="magnifyingglass" Size="12"
+                           VerticalAlignment="Center" Margin="0,0,6,0"
+                           Foreground="{DynamicResource SecondaryTextBrush}" />
+              <TextBox Grid.Column="1" x:Name="FilterBox" Watermark="Filter by name"
+                       VerticalAlignment="Center" />
+              <Button Grid.Column="2" x:Name="ClearFilter" Classes="plain" IsVisible="False"
+                      Click="OnClearFilter">
+                <views:Glyph Symbol="xmark.circle.fill" Size="13"
+                             Foreground="{DynamicResource TertiaryTextBrush}" />
+              </Button>
+            </Grid>
+          </Border>
+
+          <Button Classes="prominent" Click="OnUploadMenu" ToolTip.Tip="Upload files or folders">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <views:Glyph Symbol="square.and.arrow.up" Size="14" VerticalAlignment="Center"
+                           Foreground="{DynamicResource OnAccentTextBrush}" />
+              <TextBlock Text="Upload" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+
+          <Border Classes="segments" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal" Spacing="2">
+              <ToggleButton x:Name="GridToggle" Classes="segment" Padding="9,4"
+                            Click="OnViewModeClicked" Tag="grid" ToolTip.Tip="Grid">
+                <views:Glyph Symbol="square.grid.2x2" Size="13" />
+              </ToggleButton>
+              <ToggleButton x:Name="ListToggle" Classes="segment" Padding="9,4"
+                            Click="OnViewModeClicked" Tag="list" ToolTip.Tip="List">
+                <views:Glyph Symbol="list.bullet" Size="13" />
+              </ToggleButton>
+            </StackPanel>
+          </Border>
+
+          <Button Classes="icon" Click="OnSortMenu" ToolTip.Tip="Sort">
+            <views:Glyph Symbol="arrow.up.arrow.down" Size="15" />
+          </Button>
+
+          <Button Classes="icon" Click="OnRefresh" ToolTip.Tip="Refresh">
+            <views:Glyph Symbol="arrow.clockwise" Size="15" />
+          </Button>
+
+          <Button x:Name="SelectAllButton" Click="OnToggleSelectAll" Content="Select all" />
+
+          <Button Classes="icon" Click="OnMoreMenu" ToolTip.Tip="More">
+            <views:Glyph Symbol="ellipsis.circle" Size="15" />
+          </Button>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- Status bar -->
+    <Border DockPanel.Dock="Bottom" BorderThickness="0,1,0,0"
+            BorderBrush="{DynamicResource SeparatorBrush}">
+      <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto" Margin="14,6">
+        <TextBlock Grid.Column="0" x:Name="CountsLabel" Classes="caption secondary"
+                   VerticalAlignment="Center" />
+        <Button Grid.Column="1" x:Name="LoadMoreButton" Classes="link" Margin="12,0,0,0"
+                Content="Load more…" IsVisible="False" Click="OnLoadMore" />
+        <ProgressBar Grid.Column="2" x:Name="BusyBar" IsIndeterminate="True" IsVisible="False"
+                     Width="40" Height="3" Margin="12,0,0,0" VerticalAlignment="Center" />
+        <StackPanel Grid.Column="4" x:Name="ActiveTransfers" Orientation="Horizontal" Spacing="6"
+                    IsVisible="False" VerticalAlignment="Center">
+          <ProgressBar IsIndeterminate="True" Width="34" Height="3" VerticalAlignment="Center" />
+          <TextBlock x:Name="ActiveTransfersLabel" Classes="caption secondary"
+                     VerticalAlignment="Center" />
+        </StackPanel>
+        <TextBlock Grid.Column="5" x:Name="LastSyncLabel" Classes="caption tertiary"
+                   Margin="12,0" VerticalAlignment="Center" />
+        <Button Grid.Column="6" Classes="link" Click="OnRefresh">
+          <StackPanel Orientation="Horizontal" Spacing="5">
+            <views:Glyph Symbol="arrow.triangle.2.circlepath" Size="12" VerticalAlignment="Center"
+                         Foreground="{DynamicResource ThemePrimaryBrush}" />
+            <TextBlock Text="Sync" Classes="caption" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+      </Grid>
+    </Border>
+
+    <!-- Content -->
+    <Panel>
+
+      <!-- Grid view -->
+      <ScrollViewer x:Name="GridScroller" PointerPressed="OnBackgroundPressed">
+        <ItemsControl x:Name="GridHost" Margin="16,16,16,60">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <WrapPanel Orientation="Horizontal" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Border Classes="tile" Classes.selected="{Binding IsSelected}"
+                      Width="196" Margin="7" ClipToBounds="True" Cursor="Hand"
+                      PointerPressed="OnTilePressed" DoubleTapped="OnTileDoubleTapped">
+                <Border.ContextFlyout>
+                  <MenuFlyout>
+                    <MenuItem Header="Preview" Click="OnMenuPreview" />
+                    <MenuItem Header="Get Info" Click="OnMenuInfo" />
+                    <MenuItem Header="Copy Share Link (7 days)" Click="OnMenuCopyLink" />
+                    <Separator />
+                    <MenuItem Header="Download…" Click="OnMenuDownload" />
+                    <MenuItem Header="Move To…" Click="OnMenuMove" />
+                    <MenuItem Header="Rename…" Click="OnMenuRename" />
+                    <MenuItem Header="Copy Key" Click="OnMenuCopyKey" />
+                    <Separator />
+                    <MenuItem Header="Delete…" Click="OnMenuDelete" />
+                  </MenuFlyout>
+                </Border.ContextFlyout>
+
+                <StackPanel>
+                  <Panel Height="106" Background="{DynamicResource FaintFillBrush}">
+                    <Image Source="{Binding Thumbnail}" Stretch="UniformToFill"
+                           IsVisible="{Binding HasThumbnail}" />
+                    <views:Glyph Symbol="{Binding SymbolName}" Size="38"
+                                 HorizontalAlignment="Center" VerticalAlignment="Center"
+                                 IsVisible="{Binding ShowSymbol}"
+                                 Foreground="{Binding SymbolBrush}" />
+
+                    <views:Glyph Symbol="checkmark.circle.fill" Size="18" Margin="6"
+                                 HorizontalAlignment="Left" VerticalAlignment="Top"
+                                 IsVisible="{Binding IsSelected}"
+                                 Foreground="{DynamicResource ThemePrimaryBrush}" />
+
+                    <Border Background="#8C000000" CornerRadius="9" Padding="5,2" Margin="5"
+                            HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                            IsVisible="{Binding ShowSizeBadge}">
+                      <TextBlock Text="{Binding FormattedSize}" FontSize="9.5"
+                                 FontWeight="SemiBold" Foreground="White" />
+                    </Border>
+                  </Panel>
+
+                  <StackPanel Margin="11,9" Spacing="2">
+                    <TextBlock Text="{Binding Name}" Classes="callout" FontWeight="Medium"
+                               TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding Subtitle}" Classes="caption2 secondary"
+                               TextTrimming="CharacterEllipsis" />
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+
+      <!-- List view -->
+      <DataGrid x:Name="ListHost" IsVisible="False"
+                AutoGenerateColumns="False" CanUserSortColumns="True"
+                CanUserResizeColumns="True" SelectionMode="Extended"
+                HeadersVisibility="Column" Margin="0,0,0,52"
+                DoubleTapped="OnListDoubleTapped">
+        <DataGrid.Columns>
+          <DataGridTemplateColumn Header="Name" Width="2*" SortMemberPath="Name">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate>
+                <StackPanel Orientation="Horizontal" Spacing="7" Margin="4,0">
+                  <views:Glyph Symbol="{Binding SymbolName}" Size="15" Width="18"
+                               VerticalAlignment="Center"
+                               Foreground="{Binding SymbolBrush}" />
+                  <TextBlock Text="{Binding Name}" VerticalAlignment="Center"
+                             TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <DataGridTextColumn Header="Size" Binding="{Binding FormattedSize}"
+                              SortMemberPath="Size" Width="110" />
+          <DataGridTextColumn Header="Modified" Binding="{Binding ModifiedText}"
+                              SortMemberPath="SortDate" Width="180" />
+          <DataGridTextColumn Header="Kind" Binding="{Binding KindLabel}"
+                              SortMemberPath="KindLabel" Width="110" />
+        </DataGrid.Columns>
+        <DataGrid.ContextFlyout>
+          <MenuFlyout>
+            <MenuItem Header="Preview" Click="OnMenuPreview" />
+            <MenuItem Header="Get Info" Click="OnMenuInfo" />
+            <MenuItem Header="Copy Share Link (7 days)" Click="OnMenuCopyLink" />
+            <Separator />
+            <MenuItem Header="Download…" Click="OnMenuDownload" />
+            <MenuItem Header="Move To…" Click="OnMenuMove" />
+            <MenuItem Header="Rename…" Click="OnMenuRename" />
+            <MenuItem Header="Copy Key" Click="OnMenuCopyKey" />
+            <Separator />
+            <MenuItem Header="Delete…" Click="OnMenuDelete" />
+          </MenuFlyout>
+        </DataGrid.ContextFlyout>
+      </DataGrid>
+
+      <!-- Loading -->
+      <StackPanel x:Name="LoadingBlock" IsVisible="False" Spacing="10"
+                  HorizontalAlignment="Center" VerticalAlignment="Center">
+        <ProgressBar IsIndeterminate="True" Width="160" />
+        <TextBlock Text="Loading…" Classes="secondary" HorizontalAlignment="Center" />
+      </StackPanel>
+
+      <!-- Empty state -->
+      <Border x:Name="EmptyBlock" Classes="card" Padding="34" MaxWidth="400"
+              HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="False">
+        <StackPanel Spacing="12">
+          <views:Glyph x:Name="EmptyGlyph" Symbol="folder" Size="38" HorizontalAlignment="Center"
+                       Foreground="{DynamicResource ThemePrimaryBrush}" />
+          <TextBlock x:Name="EmptyTitle" Classes="title3" HorizontalAlignment="Center" />
+          <TextBlock x:Name="EmptyDetail" Classes="callout secondary" TextAlignment="Center"
+                     TextWrapping="Wrap" />
+          <Button x:Name="EmptyUploadButton" Classes="prominent" HorizontalAlignment="Center"
+                  Padding="16,8" Click="OnUploadMenu">
+            <StackPanel Orientation="Horizontal" Spacing="7">
+              <views:Glyph Symbol="square.and.arrow.up" Size="15" VerticalAlignment="Center"
+                           Foreground="{DynamicResource OnAccentTextBrush}" />
+              <TextBlock Text="Upload Files" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+      </Border>
+
+      <!-- Selection action bar -->
+      <Border x:Name="SelectionBar" Classes="floatingBar" IsVisible="False"
+              HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,14">
+        <StackPanel Orientation="Horizontal" Spacing="4">
+          <TextBlock x:Name="SelectionCount" Classes="callout" FontWeight="SemiBold"
+                     VerticalAlignment="Center" Margin="0,0,6,0" />
+          <Button Classes="plain" Padding="8,5" Click="OnMenuDownload">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <views:Glyph Symbol="square.and.arrow.down" Size="13" VerticalAlignment="Center" />
+              <TextBlock Text="Download" Classes="caption" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button x:Name="MoveButton" Classes="plain" Padding="8,5" Click="OnMenuMove">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <views:Glyph Symbol="folder" Size="13" VerticalAlignment="Center" />
+              <TextBlock Text="Move…" Classes="caption" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button x:Name="RenameButton" Classes="plain" Padding="8,5" Click="OnMenuRename">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <views:Glyph Symbol="pencil" Size="13" VerticalAlignment="Center" />
+              <TextBlock x:Name="RenameLabel" Text="Rename…" Classes="caption"
+                         VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button x:Name="CopyLinkButton" Classes="plain" Padding="8,5" Click="OnMenuCopyLink">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <views:Glyph Symbol="link" Size="13" VerticalAlignment="Center" />
+              <TextBlock Text="Copy Link" Classes="caption" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button Classes="plain" Padding="8,5" Click="OnMenuCopyKey">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <views:Glyph Symbol="doc.on.doc" Size="13" VerticalAlignment="Center" />
+              <TextBlock x:Name="CopyKeysLabel" Text="Copy Keys" Classes="caption"
+                         VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button Classes="plain" Padding="8,5" Click="OnMenuDelete"
+                  Foreground="{DynamicResource DangerBrush}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <views:Glyph Symbol="trash" Size="13" VerticalAlignment="Center"
+                           Foreground="{DynamicResource DangerBrush}" />
+              <TextBlock Text="Delete" Classes="caption" VerticalAlignment="Center"
+                         Foreground="{DynamicResource DangerBrush}" />
+            </StackPanel>
+          </Button>
+          <Border Width="1" Height="16" Margin="3,0"
+                  Background="{DynamicResource SeparatorBrush}" />
+          <Button Classes="plain" Click="OnClearSelection" ToolTip.Tip="Clear selection">
+            <views:Glyph Symbol="xmark.circle.fill" Size="15"
+                         Foreground="{DynamicResource SecondaryTextBrush}" />
+          </Button>
+        </StackPanel>
+      </Border>
+
+      <!-- Drop target overlay -->
+      <Panel x:Name="DropOverlay" IsVisible="False" IsHitTestVisible="False" Margin="8">
+        <Rectangle RadiusX="12" RadiusY="12" StrokeThickness="3"
+                   StrokeDashArray="6,4"
+                   Stroke="{DynamicResource ThemePrimaryBrush}"
+                   Fill="{DynamicResource ThemePrimaryFaintBrush}" />
+        <Border Background="{DynamicResource GlassBrush}" CornerRadius="10" Padding="12"
+                HorizontalAlignment="Center" VerticalAlignment="Center">
+          <StackPanel Orientation="Horizontal" Spacing="9">
+            <views:Glyph Symbol="arrow.up.doc" Size="20" VerticalAlignment="Center" />
+            <TextBlock x:Name="DropLabel" FontSize="16" FontWeight="Medium"
+                       VerticalAlignment="Center" />
+          </StackPanel>
+        </Border>
+      </Panel>
+
+    </Panel>
+  </DockPanel>
+</UserControl>

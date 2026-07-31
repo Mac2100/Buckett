@@ -1,0 +1,145 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:Buckett.Views"
+        x:Class="Buckett.Views.MoveWindow"
+        Title="Move Files"
+        Width="540" SizeToContent="Height" CanResize="False"
+        Icon="avares://Buckett/Assets/app.ico"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        WindowStartupLocation="CenterOwner">
+
+  <StackPanel Margin="22" Spacing="14">
+
+    <Grid ColumnDefinitions="*,Auto">
+      <TextBlock Grid.Column="0" Text="Move Files" Classes="title" />
+      <Button Grid.Column="1" Classes="plain" IsCancel="True" Click="OnCancel">
+        <views:Glyph Symbol="xmark" Size="13"
+                     Foreground="{DynamicResource SecondaryTextBrush}" />
+      </Button>
+    </Grid>
+
+    <StackPanel Orientation="Horizontal" Spacing="7">
+      <views:Glyph Symbol="info.circle" Size="14" VerticalAlignment="Center"
+                   Foreground="{DynamicResource SecondaryTextBrush}" />
+      <TextBlock x:Name="SummaryLabel" Classes="callout secondary" VerticalAlignment="Center"
+                 TextTrimming="CharacterEllipsis" />
+    </StackPanel>
+
+    <StackPanel Spacing="6">
+      <TextBlock Text="Destination" Classes="callout" FontWeight="Medium" />
+      <Grid ColumnDefinitions="*,*">
+        <ComboBox Grid.Column="0" x:Name="AccountPicker" Margin="0,0,4,0"
+                  HorizontalAlignment="Stretch" />
+        <ComboBox Grid.Column="1" x:Name="BucketPicker" Margin="4,0,0,0"
+                  HorizontalAlignment="Stretch" />
+      </Grid>
+      <StackPanel x:Name="CrossAccountNote" Orientation="Horizontal" Spacing="7"
+                  IsVisible="False">
+        <views:Glyph Symbol="arrow.down.and.line.horizontal.and.arrow.up" Size="13"
+                     VerticalAlignment="Center"
+                     Foreground="{DynamicResource WarningBrush}" />
+        <TextBlock Classes="caption warning" TextWrapping="Wrap"
+                   Text="Different account — files transfer through this PC (download, then upload)." />
+      </StackPanel>
+    </StackPanel>
+
+    <StackPanel Spacing="6">
+      <TextBlock Text="Select target folder" Classes="callout" FontWeight="Medium" />
+      <Border Background="{DynamicResource FaintFillBrush}"
+              BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1"
+              CornerRadius="9" ClipToBounds="True">
+        <DockPanel>
+          <Border DockPanel.Dock="Top" BorderThickness="0,0,0,1"
+                  BorderBrush="{DynamicResource SeparatorBrush}">
+            <Grid ColumnDefinitions="*,Auto" Margin="10,7">
+              <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Auto"
+                            VerticalScrollBarVisibility="Disabled">
+                <StackPanel Orientation="Horizontal" Spacing="3">
+                  <Button Classes="link" Click="OnBrowseRoot">
+                    <StackPanel Orientation="Horizontal" Spacing="5">
+                      <views:Glyph Symbol="tray.full" Size="12" VerticalAlignment="Center" />
+                      <TextBlock Text="Root" Classes="caption" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </Button>
+                  <ItemsControl x:Name="CrumbHost">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" Spacing="3" />
+                      </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <StackPanel Orientation="Horizontal" Spacing="3">
+                          <views:Glyph Symbol="chevron.right" Size="8" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TertiaryTextBrush}" />
+                          <Button Classes="link" Content="{Binding Name}" FontSize="11.5"
+                                  Click="OnCrumbClicked" />
+                        </StackPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </ScrollViewer>
+              <ProgressBar Grid.Column="1" x:Name="FolderSpinner" IsIndeterminate="True"
+                           Width="34" Height="3" VerticalAlignment="Center" IsVisible="False" />
+            </Grid>
+          </Border>
+
+          <ScrollViewer Height="140">
+            <StackPanel>
+              <TextBlock x:Name="NoFoldersLabel" Margin="10" Classes="caption tertiary"
+                         TextWrapping="Wrap"
+                         Text="No subfolders here — files will move into this folder."
+                         IsVisible="False" />
+              <ItemsControl x:Name="FolderHost">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Button Classes="plain" HorizontalAlignment="Stretch" Padding="10,6"
+                            Click="OnFolderClicked">
+                      <Grid ColumnDefinitions="Auto,*,Auto">
+                        <views:Glyph Grid.Column="0" Symbol="folder" Size="14"
+                                     VerticalAlignment="Center" Margin="0,0,7,0"
+                                     Foreground="{DynamicResource ThemeSecondaryBrush}" />
+                        <TextBlock Grid.Column="1" Text="{Binding Name}" Classes="callout"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" />
+                        <views:Glyph Grid.Column="2" Symbol="chevron.right" Size="9"
+                                     VerticalAlignment="Center"
+                                     Foreground="{DynamicResource TertiaryTextBrush}" />
+                      </Grid>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </ScrollViewer>
+        </DockPanel>
+      </Border>
+    </StackPanel>
+
+    <StackPanel Spacing="6">
+      <TextBlock Text="Or enter path" Classes="callout" FontWeight="Medium" />
+      <TextBox x:Name="CustomPath" Watermark="e.g. images/2026/march/" />
+      <TextBlock Text="Leave empty to use the folder selected above."
+                 Classes="caption tertiary" />
+    </StackPanel>
+
+    <StackPanel Spacing="6">
+      <TextBlock Text="Conflict handling" Classes="callout" FontWeight="Medium" />
+      <StackPanel x:Name="StrategyHost" Spacing="4" />
+    </StackPanel>
+
+    <Grid ColumnDefinitions="Auto,*,Auto">
+      <Button Grid.Column="0" Content="Cancel" IsCancel="True" Click="OnCancel" />
+      <Button Grid.Column="2" x:Name="MoveButton" Classes="prominent" IsDefault="True"
+              Click="OnMove">
+        <StackPanel Orientation="Horizontal" Spacing="7">
+          <views:Glyph Symbol="folder.badge.plus" Size="14" VerticalAlignment="Center"
+                       Foreground="{DynamicResource OnAccentTextBrush}" />
+          <TextBlock x:Name="MoveLabel" VerticalAlignment="Center" />
+        </StackPanel>
+      </Button>
+    </Grid>
+
+  </StackPanel>
+</Window>

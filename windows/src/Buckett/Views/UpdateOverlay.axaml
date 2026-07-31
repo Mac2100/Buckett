@@ -1,0 +1,43 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:Buckett.Views"
+             x:Class="Buckett.Views.UpdateOverlay"
+             IsVisible="False">
+
+  <!-- The bucket glyph bobs while the update downloads, exactly as on macOS.
+       Driven from code-behind: Avalonia has no animator for RenderTransform
+       itself, so the animation targets the TranslateTransform instead. -->
+
+  <Panel Background="{DynamicResource ScrimBrush}">
+    <Border Background="{DynamicResource GlassBrush}"
+            BorderBrush="{DynamicResource BorderSoftBrush}"
+            BorderThickness="1"
+            CornerRadius="18"
+            Padding="28"
+            BoxShadow="0 8 22 0 #40000000"
+            HorizontalAlignment="Center" VerticalAlignment="Center">
+      <StackPanel Spacing="16" HorizontalAlignment="Center">
+        <views:AppGlyph x:Name="Bucket" GlyphSize="60" HorizontalAlignment="Center" />
+
+        <StackPanel x:Name="DownloadingBlock" Spacing="7" HorizontalAlignment="Center">
+          <ProgressBar x:Name="DownloadProgress" Width="220" Minimum="0" Maximum="1" />
+          <TextBlock x:Name="DownloadLabel" Classes="callout digits" FontWeight="Medium"
+                     HorizontalAlignment="Center" />
+        </StackPanel>
+
+        <StackPanel x:Name="InstallingBlock" Spacing="7" HorizontalAlignment="Center"
+                    IsVisible="False">
+          <ProgressBar IsIndeterminate="True" Width="220" />
+          <TextBlock Text="Installing…" Classes="callout" FontWeight="Medium"
+                     HorizontalAlignment="Center" />
+        </StackPanel>
+
+        <TextBlock x:Name="RelaunchingLabel" Text="Relaunching…" Classes="callout"
+                   FontWeight="Medium" HorizontalAlignment="Center" IsVisible="False" />
+
+        <TextBlock Text="Buckett will reopen automatically" Classes="caption secondary"
+                   HorizontalAlignment="Center" />
+      </StackPanel>
+    </Border>
+  </Panel>
+</UserControl>

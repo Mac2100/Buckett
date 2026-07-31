@@ -4,3 +4,8 @@ dist/
 *.xcodeproj
 .swiftpm/
 xcuserdata/
+
+# Windows app (.NET)
+bin/
+obj/
+*.user

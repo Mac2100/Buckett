@@ -1,0 +1,176 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:Buckett.Views"
+        x:Class="Buckett.Views.OnboardingWindow"
+        Title="Add Account"
+        Width="660" Height="580"
+        CanResize="False"
+        Icon="avares://Buckett/Assets/app.ico"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        WindowStartupLocation="CenterOwner">
+
+  <DockPanel>
+
+    <!-- Stepper header -->
+    <Border DockPanel.Dock="Top" BorderThickness="0,0,0,1"
+            BorderBrush="{DynamicResource SeparatorBrush}">
+      <ItemsControl x:Name="StepHost" Margin="28,24,28,18">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <UniformGrid Columns="4" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <Grid ColumnDefinitions="*,Auto,*">
+              <Border Grid.Column="0" Height="2" VerticalAlignment="Center" Margin="0,0,6,22"
+                      Background="{Binding LeftLine}" IsVisible="{Binding ShowLeftLine}" />
+              <StackPanel Grid.Column="1" Spacing="6">
+                <Border Width="34" Height="34" CornerRadius="17" Background="{Binding Fill}"
+                        HorizontalAlignment="Center">
+                  <views:Glyph Symbol="{Binding Symbol}" Size="14"
+                               Foreground="{Binding IconBrush}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <TextBlock Text="{Binding Title}" Classes="caption"
+                           Foreground="{Binding TextBrush}" HorizontalAlignment="Center" />
+              </StackPanel>
+              <Border Grid.Column="2" Height="2" VerticalAlignment="Center" Margin="6,0,0,22"
+                      Background="{Binding RightLine}" IsVisible="{Binding ShowRightLine}" />
+            </Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </Border>
+
+    <!-- Footer -->
+    <Border DockPanel.Dock="Bottom" BorderThickness="0,1,0,0"
+            BorderBrush="{DynamicResource SeparatorBrush}">
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="24,14">
+        <Button Grid.Column="0" Content="Cancel" IsCancel="True" Click="OnCancel" />
+        <Button Grid.Column="2" x:Name="PreviousButton" Content="Previous" Margin="0,0,8,0"
+                Click="OnPrevious" IsVisible="False" />
+        <Button Grid.Column="3" x:Name="NextButton" Classes="prominent" IsDefault="True"
+                Click="OnNext" Content="Next" />
+      </Grid>
+    </Border>
+
+    <ScrollViewer>
+      <Panel Margin="28">
+
+        <!-- Step 1: provider -->
+        <StackPanel x:Name="ProviderStep" Spacing="16" MaxWidth="480">
+          <StackPanel Spacing="4">
+            <TextBlock Text="Choose your storage provider" Classes="title3" />
+            <TextBlock Text="All are S3-compatible — Buckett talks to them directly."
+                       Classes="callout secondary" />
+          </StackPanel>
+          <ItemsControl x:Name="ProviderCards">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <UniformGrid Columns="3" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Button Classes="plain" Margin="6" Padding="0" Click="OnPickProvider">
+                  <Border CornerRadius="12" Padding="0,22" Background="{Binding Background}"
+                          BorderBrush="{Binding Border}" BorderThickness="1">
+                    <StackPanel Spacing="10">
+                      <views:Glyph Symbol="{Binding Symbol}" Size="26"
+                                   HorizontalAlignment="Center"
+                                   Foreground="{Binding IconBrush}" />
+                      <TextBlock Text="{Binding Name}" Classes="callout" FontWeight="Medium"
+                                 HorizontalAlignment="Center" />
+                    </StackPanel>
+                  </Border>
+                </Button>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <StackPanel Spacing="6">
+            <TextBlock Text="Display name" Classes="callout" FontWeight="Medium" />
+            <TextBox x:Name="NameBox" />
+          </StackPanel>
+        </StackPanel>
+
+        <!-- Step 2: connection -->
+        <StackPanel x:Name="ConnectionStep" Spacing="16" MaxWidth="480" IsVisible="False">
+          <StackPanel Spacing="4">
+            <TextBlock x:Name="ConnectionTitle" Classes="title3" />
+            <TextBlock x:Name="ConnectionSubtitle" Classes="callout secondary"
+                       TextWrapping="Wrap" />
+          </StackPanel>
+          <StackPanel Spacing="6">
+            <TextBlock x:Name="RegionLabel" Classes="callout" FontWeight="Medium" />
+            <TextBox x:Name="RegionBox" />
+          </StackPanel>
+          <StackPanel Spacing="6">
+            <TextBlock Text="Custom endpoint (optional)" Classes="callout" FontWeight="Medium" />
+            <TextBox x:Name="EndpointBox" Watermark="Overrides the derived endpoint" />
+          </StackPanel>
+          <Border Background="{DynamicResource FaintFillBrush}" CornerRadius="8" Padding="10">
+            <StackPanel Orientation="Horizontal" Spacing="7">
+              <views:Glyph Symbol="link" Size="13" VerticalAlignment="Center"
+                           Foreground="{DynamicResource SecondaryTextBrush}" />
+              <SelectableTextBlock x:Name="EndpointPreview" Classes="caption mono secondary"
+                                   VerticalAlignment="Center" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
+        <!-- Step 3: credentials -->
+        <StackPanel x:Name="CredentialsStep" Spacing="16" MaxWidth="480" IsVisible="False">
+          <StackPanel Spacing="4">
+            <TextBlock Text="API credentials" Classes="title3" />
+            <TextBlock x:Name="CredentialsHint" Classes="callout secondary" TextWrapping="Wrap" />
+          </StackPanel>
+          <StackPanel Spacing="6">
+            <TextBlock Text="Access Key ID" Classes="callout" FontWeight="Medium" />
+            <TextBox x:Name="AccessKeyBox" />
+          </StackPanel>
+          <StackPanel Spacing="6">
+            <TextBlock Text="Secret Access Key" Classes="callout" FontWeight="Medium" />
+            <TextBox x:Name="SecretKeyBox" PasswordChar="•" />
+          </StackPanel>
+          <Button Classes="link" HorizontalAlignment="Left" Click="OnOpenConsole">
+            <StackPanel Orientation="Horizontal" Spacing="7">
+              <views:Glyph Symbol="arrow.up.right.square" Size="14" VerticalAlignment="Center"
+                           Foreground="{DynamicResource ThemePrimaryBrush}" />
+              <TextBlock x:Name="ConsoleLinkLabel" Classes="callout" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <views:Glyph Symbol="lock.shield" Size="14" VerticalAlignment="Top"
+                         Foreground="{DynamicResource SecondaryTextBrush}" />
+            <TextBlock x:Name="PrivacyNote" Classes="caption secondary" TextWrapping="Wrap"
+                       MaxWidth="420" />
+          </StackPanel>
+        </StackPanel>
+
+        <!-- Step 4: finish -->
+        <StackPanel x:Name="FinishStep" Spacing="18" IsVisible="False"
+                    HorizontalAlignment="Center" Margin="0,10,0,0">
+          <views:AppGlyph GlyphSize="56" HorizontalAlignment="Center" />
+          <TextBlock x:Name="FinishName" Classes="title3" HorizontalAlignment="Center" />
+          <TextBlock Text="Run a quick connection test, then you're done."
+                     Classes="secondary" HorizontalAlignment="Center" />
+          <Button x:Name="TestButton" HorizontalAlignment="Center" MinWidth="140"
+                  Padding="16,8" Click="OnTestConnection" Content="Test Connection" />
+          <ProgressBar x:Name="TestSpinner" IsIndeterminate="True" Width="140"
+                       HorizontalAlignment="Center" IsVisible="False" />
+          <StackPanel x:Name="TestResultBlock" Spacing="4" IsVisible="False">
+            <StackPanel Orientation="Horizontal" Spacing="7" HorizontalAlignment="Center">
+              <views:Glyph x:Name="TestGlyph" Size="15" VerticalAlignment="Center" />
+              <TextBlock x:Name="TestLabel" TextWrapping="Wrap" MaxWidth="400"
+                         TextAlignment="Center" VerticalAlignment="Center" />
+            </StackPanel>
+            <TextBlock x:Name="TestTip" Classes="caption secondary" TextAlignment="Center"
+                       TextWrapping="Wrap" MaxWidth="400" IsVisible="False" />
+          </StackPanel>
+        </StackPanel>
+
+      </Panel>
+    </ScrollViewer>
+  </DockPanel>
+</Window>

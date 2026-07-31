@@ -1,0 +1,44 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Buckett.Views.MetadataWindow"
+        Title="Info"
+        Width="520" Height="400"
+        Icon="avares://Buckett/Assets/app.ico"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        WindowStartupLocation="CenterOwner">
+
+  <DockPanel>
+    <Border DockPanel.Dock="Top" BorderThickness="0,0,0,1"
+            BorderBrush="{DynamicResource SeparatorBrush}">
+      <Grid ColumnDefinitions="*,Auto" Margin="12">
+        <TextBlock Grid.Column="0" Text="Info" Classes="headline" VerticalAlignment="Center" />
+        <Button Grid.Column="1" Content="Done" IsCancel="True" Click="OnDone" />
+      </Grid>
+    </Border>
+
+    <Panel>
+      <ProgressBar x:Name="Spinner" IsIndeterminate="True" Width="180"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+
+      <ScrollViewer x:Name="Scroller" IsVisible="False">
+        <ItemsControl x:Name="Host" Margin="16">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <StackPanel Spacing="8" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Grid ColumnDefinitions="130,*">
+                <TextBlock Grid.Column="0" Text="{Binding Label}" Classes="secondary"
+                           TextAlignment="Right" Margin="0,0,16,0" />
+                <SelectableTextBlock Grid.Column="1" Text="{Binding Value}"
+                                     TextWrapping="Wrap" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Panel>
+  </DockPanel>
+</Window>
