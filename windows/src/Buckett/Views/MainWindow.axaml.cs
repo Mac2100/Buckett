@@ -37,17 +37,17 @@ public partial class MainWindow : Window
     }
 
     /// Closing the window must NOT quit the app — Buckett lives on in the
-    /// notification area; the window comes back from the tray menu or the
-    /// desktop drop target. With both of those turned off there would be no way
-    /// back, so then the close really does quit.
+    /// notification area, and the window comes back from the tray menu. With
+    /// the tray icon turned off there would be no way back, so then the close
+    /// really does quit.
     ///
     /// Only the user clicking the close button gets that treatment. Windows
     /// logging off, or an installer's restart manager asking the app to go
-    /// away, must be obeyed: refusing left Buckett running — drop target still
-    /// floating on the desktop — after it had supposedly been uninstalled.
+    /// away, must be obeyed: refusing left Buckett running after it had
+    /// supposedly been uninstalled.
     protected override void OnClosing(WindowClosingEventArgs e)
     {
-        var hasWayBack = Settings.Shared.ShowTrayIcon || Settings.Shared.ShowDropTarget;
+        var hasWayBack = Settings.Shared.ShowTrayIcon;
         if (ShouldHideToTray(e.CloseReason, App.IsShuttingDown, hasWayBack))
         {
             e.Cancel = true;

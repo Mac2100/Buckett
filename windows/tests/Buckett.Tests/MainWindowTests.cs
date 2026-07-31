@@ -58,14 +58,6 @@ public class MainWindowTests
         Assert.NotNull(new DashboardView());
     }
 
-    /// The floating drop target is created during startup whenever the setting
-    /// is on, which it is by default.
-    [AvaloniaFact]
-    public void DropTargetConstructs()
-    {
-        Assert.NotNull(new DropPadWindow());
-    }
-
     /// The theme palette builds Avalonia brushes, so it is only ever valid on
     /// the UI thread — which is where the app touches it. Pinned here rather
     /// than alongside the background-safe initialisers.

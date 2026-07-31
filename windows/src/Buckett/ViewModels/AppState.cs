@@ -20,28 +20,6 @@ public sealed record AccountBucket(Account Account, Bucket Bucket)
     public string Id => Account.Id + "|" + Bucket.Name;
 }
 
-/// A drop destination that can live in ANY account, encoded for settings
-/// as "accountUUID|bucketName".
-public readonly record struct DropTarget(Guid AccountID, string Bucket)
-{
-    public string Encoded => $"{AccountID.ToString("D").ToUpperInvariant()}|{Bucket}";
-
-    public static DropTarget? Decode(string encoded)
-    {
-        var separator = encoded.IndexOf('|');
-        if (separator <= 0) return null;
-        if (!Guid.TryParse(encoded[..separator], out var id)) return null;
-        var name = encoded[(separator + 1)..];
-        return name.Length == 0 ? null : new DropTarget(id, name);
-    }
-}
-
-/// Row shown in the drop-target hover panel.
-public sealed record DropRow(DropTarget Target, string DisplayName, string AccountName)
-{
-    public string Id => Target.Encoded;
-}
-
 public sealed class SidebarSelection : IEquatable<SidebarSelection>
 {
     private SidebarSelection(string? bucket) => Bucket = bucket;
@@ -307,9 +285,6 @@ public sealed class AppState : ObservableObject
         }
     }
 
-    public bool IsValidDropTarget(DropTarget target) =>
-        BucketList(target.AccountID).Any(bucket => bucket.Name == target.Bucket);
-
     public async Task CreateBucketAsync(string name)
     {
         var client = CurrentClient;
@@ -363,13 +338,6 @@ public sealed class AppState : ObservableObject
         _stats.Remove(StatsKey(account.Id, name));
         BucketAliases.Shared.SetAlias(null, account.Id, name);
 
-        var encoded = new DropTarget(account.Id, name).Encoded;
-        var shortlist = Settings.Shared.TrayDropBuckets;
-        if (shortlist.Contains(encoded))
-        {
-            Settings.Shared.SetTrayDropBuckets(shortlist.Where(entry => entry != encoded));
-        }
-
         if (_accountBuckets.TryGetValue(account.Id, out var list))
         {
             list.RemoveAll(bucket => bucket.Name == name);
@@ -381,103 +349,6 @@ public sealed class AppState : ObservableObject
             if (SidebarSelection.Bucket == name) SidebarSelection = SidebarSelection.Dashboard;
             await LoadBucketsAsync().ConfigureAwait(true);
         }
-    }
-
-    // MARK: - Drop target uploads
-
-    /// Where drops go by default: the first checked drop-menu bucket (any
-    /// account), else the selected bucket, else the account's first bucket.
-    public DropTarget? AutoDropTarget()
-    {
-        foreach (var encoded in Settings.Shared.TrayDropBuckets)
-        {
-            if (DropTarget.Decode(encoded) is { } target && IsValidDropTarget(target)) return target;
-        }
-        if (SelectedAccountID is not { } selectedID) return null;
-        if (SidebarSelection.Bucket is { } current)
-        {
-            return new DropTarget(selectedID, current);
-        }
-        var first = BucketList(selectedID).FirstOrDefault();
-        return first == null ? null : new DropTarget(selectedID, first.Name);
-    }
-
-    /// Rows for the hover panel: the checked shortlist, or the automatic target.
-    public List<DropRow> DropRows()
-    {
-        DropRow? MakeRow(DropTarget target)
-        {
-            var account = AccountStore.Accounts.FirstOrDefault(a => a.Id == target.AccountID);
-            if (account == null) return null;
-            return new DropRow(
-                target,
-                BucketAliases.Shared.DisplayName(target.AccountID, target.Bucket),
-                account.DisplayLabel);
-        }
-
-        var rows = Settings.Shared.TrayDropBuckets
-            .Select(DropTarget.Decode)
-            .Where(target => target.HasValue && IsValidDropTarget(target.Value))
-            .Select(target => MakeRow(target!.Value))
-            .Where(row => row != null)
-            .Select(row => row!)
-            .ToList();
-
-        if (rows.Count == 0 && AutoDropTarget() is { } auto && MakeRow(auto) is { } autoRow)
-        {
-            rows.Add(autoRow);
-        }
-        return rows;
-    }
-
-    /// Queues uploads dropped on the desktop drop target (or one of the hover
-    /// panel's bucket rows, via `target` — which may belong to any account).
-    /// Returns the resolved target for the animation, or null (with feedback)
-    /// when there is nowhere to upload.
-    public DropTarget? HandleDrop(IReadOnlyList<string> paths, DropTarget? target = null)
-    {
-        var resolved = target ?? AutoDropTarget();
-        if (resolved == null)
-        {
-            OpenMainWindowRequested?.Invoke();
-            ToastCenter.Shared.Show(
-                "No bucket available",
-                "Add an account and create a bucket, then drop files again.",
-                ToastStyle.Error);
-            return null;
-        }
-
-        var account = AccountStore.Accounts.FirstOrDefault(a => a.Id == resolved.Value.AccountID);
-        var client = account == null ? null : Client(account);
-        if (client == null)
-        {
-            OpenMainWindowRequested?.Invoke();
-            ToastCenter.Shared.Show(
-                "Missing credentials",
-                "Re-enter the secret key for this account in Settings.",
-                ToastStyle.Error);
-            return null;
-        }
-
-        var bucket = resolved.Value.Bucket;
-        _ = Task.Run(async () =>
-        {
-            var expanded = await Task
-                .Run(() => BrowserModel.ExpandForUpload(paths))
-                .ConfigureAwait(false);
-            await Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                foreach (var (filePath, suffix) in expanded)
-                {
-                    Transfers.EnqueueUpload(filePath, bucket, suffix, client);
-                }
-                Notifier.Shared.Post(
-                    Notifier.Event.DropStarted,
-                    "Upload started",
-                    $"{expanded.Count} file{(expanded.Count == 1 ? "" : "s")} → {bucket}");
-            });
-        });
-        return resolved;
     }
 
     /// Raised when something outside the main window needs it brought forward.

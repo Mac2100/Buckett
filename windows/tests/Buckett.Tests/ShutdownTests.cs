@@ -7,8 +7,8 @@ namespace Buckett.Tests;
 /// The main window hides to the notification area instead of closing, which is
 /// right when the user clicks the close button and wrong for every other kind
 /// of close request. Cancelling those left Buckett running after its own
-/// uninstaller had removed it — tray icon and desktop drop target still on
-/// screen, executable already gone from disk.
+/// uninstaller had removed it — still resident in the notification area with
+/// its executable already gone from disk.
 public class ShutdownTests
 {
     [Fact]
@@ -18,8 +18,8 @@ public class ShutdownTests
             WindowCloseReason.WindowClosing, shuttingDown: false, hasWayBack: true));
     }
 
-    /// With no tray icon and no drop target there is nothing to come back from,
-    /// so the close has to be a real quit.
+    /// With the notification-area icon hidden there is nothing to come back
+    /// from, so the close has to be a real quit.
     [Fact]
     public void ClosingQuitsWhenThereIsNoWayBack()
     {

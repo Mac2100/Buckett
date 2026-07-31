@@ -47,7 +47,7 @@ CloseApplications=yes
 RestartApplications=no
 ; Must match SingleInstance.cs. Without this, setup and — worse — uninstall
 ; happily ran while Buckett was still going, leaving the app resident with its
-; drop target on screen after the user had removed it.
+; notification area after the user had removed it.
 AppMutex=Buckett.SingleInstance,Global\Buckett.SingleInstance
 
 [Languages]
@@ -69,8 +69,8 @@ Filename: "{app}\Buckett.exe"; Description: "Launch Buckett"; Flags: nowait post
 [UninstallRun]
 ; AppMutex asks the user to close Buckett first, and the restart manager has a
 ; go at it too. This is the backstop for the case that produced the bug report:
-; the app still resident after an uninstall, tray icon and desktop drop target
-; included, with the executable already deleted from under it. Runs before any
+; the app still resident after an uninstall, notification-area icon included,
+; with the executable already deleted from under it. Runs before any
 ; files are removed. Buckett holds no unsaved documents, so there is nothing to
 ; lose by being firm about it.
 Filename: "{sys}\taskkill.exe"; Parameters: "/IM Buckett.exe /F"; Flags: runhidden skipifdoesntexist; RunOnceId: "StopBuckett"

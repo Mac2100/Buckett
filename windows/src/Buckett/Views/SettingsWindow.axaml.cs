@@ -25,6 +25,7 @@ public sealed record TrayIconRow(
 public partial class SettingsWindow : Window
 {
     private static SettingsWindow? _open;
+    private Control[] _pages = Array.Empty<Control>();
 
     private readonly AppState _state = AppState.Shared;
     private readonly ThemeStore _themes = ThemeStore.Shared;
@@ -37,7 +38,8 @@ public partial class SettingsWindow : Window
     private readonly List<ToggleButton> _providerButtons = new();
     private readonly List<ToggleButton> _appearanceButtons = new();
 
-    /// The five drop-target glyph styles, matching the macOS menu bar options.
+    /// The five notification-area glyph styles, matching the macOS menu bar
+    /// options.
     private static readonly (string Symbol, string Name)[] TrayIconStyles =
     {
         ("archivebox.fill", "Archive"),
@@ -51,6 +53,14 @@ public partial class SettingsWindow : Window
     {
         InitializeComponent();
         this.KeepOnScreen();
+
+        _pages = new Control[]
+        {
+            AccountsPage, AppearancePage, GeneralPage,
+            NotificationsPage, UpdatesPage, AboutPage
+        };
+        Nav.SelectionChanged += (_, _) => ShowSelectedSection();
+        ShowSelectedSection();
 
         BuildProviderSegments();
         BuildAppearanceSegments();
@@ -71,30 +81,42 @@ public partial class SettingsWindow : Window
         SyncUpdates();
     }
 
-    public static void Present(Window? owner, string? tab = null)
+    public static void Present(Window? owner, string? section = null)
     {
         if (_open != null)
         {
             _open.Activate();
-            if (tab != null) _open.SelectTab(tab);
+            if (section != null) _open.SelectSection(section);
             return;
         }
 
         var window = new SettingsWindow();
         _open = window;
         window.Closed += (_, _) => _open = null;
-        if (tab != null) window.SelectTab(tab);
+        if (section != null) window.SelectSection(section);
 
         if (owner != null) ((Window)window).Show(owner); else ((Window)window).Show();
     }
 
-    private void SelectTab(string tag)
+    /// The rail and the pages are matched by name — a row tagged "Updates"
+    /// shows the control called "UpdatesPage" — so adding a section means
+    /// adding a row and a page, and nothing else.
+    private void ShowSelectedSection()
     {
-        foreach (var item in Tabs.Items.OfType<TabItem>())
+        var tag = (Nav.SelectedItem as ListBoxItem)?.Tag as string;
+        foreach (var page in _pages)
+        {
+            page.IsVisible = page.Name == tag + "Page";
+        }
+    }
+
+    private void SelectSection(string tag)
+    {
+        foreach (var item in Nav.Items.OfType<ListBoxItem>())
         {
             if ((item.Tag as string) == tag)
             {
-                Tabs.SelectedItem = item;
+                Nav.SelectedItem = item;
                 return;
             }
         }
@@ -396,10 +418,6 @@ public partial class SettingsWindow : Window
         TrayIconToggle.IsCheckedChanged += (_, _) =>
             _settings.ShowTrayIcon = TrayIconToggle.IsChecked == true;
 
-        DropTargetToggle.IsChecked = _settings.ShowDropTarget;
-        DropTargetToggle.IsCheckedChanged += (_, _) =>
-            _settings.ShowDropTarget = DropTargetToggle.IsChecked == true;
-
         OpenAtLoginToggle.IsChecked = StartupRegistration.IsRegistered();
         OpenAtLoginToggle.IsCheckedChanged += (_, _) =>
         {
@@ -429,10 +447,6 @@ public partial class SettingsWindow : Window
         NotifyFailedToggle.IsChecked = _settings.NotifyTransferFailed;
         NotifyFailedToggle.IsCheckedChanged += (_, _) =>
             _settings.NotifyTransferFailed = NotifyFailedToggle.IsChecked == true;
-
-        NotifyDropToggle.IsChecked = _settings.NotifyDropStarted;
-        NotifyDropToggle.IsCheckedChanged += (_, _) =>
-            _settings.NotifyDropStarted = NotifyDropToggle.IsChecked == true;
 
         ToastsToggle.IsChecked = _settings.ShowToasts;
         ToastsToggle.IsCheckedChanged += (_, _) =>

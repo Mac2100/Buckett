@@ -1,4 +1,3 @@
-using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Buckett.Views;
 using Xunit;
@@ -43,20 +42,5 @@ public class AnimationTests
         });
 
         Assert.Null(failure);
-    }
-
-    [AvaloniaFact]
-    public void DropAnimationRuns()
-    {
-        var fileIcon = new Glyph { Symbol = "doc", Size = 30 };
-        var bucket = new Border { Width = 52, Height = 52 };
-        var caption = new TextBlock { Text = "Uploading 1 file" };
-
-        var failure = Record.Exception(
-            () => DropOverlays.RunAnimation(fileIcon, bucket, caption));
-
-        Assert.Null(failure);
-        Assert.NotNull(fileIcon.RenderTransform);
-        Assert.NotNull(bucket.RenderTransform);
     }
 }

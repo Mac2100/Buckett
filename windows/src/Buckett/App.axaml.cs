@@ -46,8 +46,7 @@ public partial class App : Application
             _mainWindow.Show();
 
             // The window is what the user came for; the notification-area icon
-            // and desktop drop target are extras. Never let a failure in them
-            // stop the app from opening.
+            // is an extra. Never let a failure in it stop the app opening.
             try
             {
                 TrayController.Shared.Setup();
@@ -56,7 +55,8 @@ public partial class App : Application
             {
                 Log.Warn($"tray setup failed: {error}");
                 ToastCenter.Shared.Show(
-                    "Drop target unavailable", error.Message, ToastStyle.Error);
+                    "Notification-area icon unavailable",
+                    error.Message, ToastStyle.Error);
             }
         }
 

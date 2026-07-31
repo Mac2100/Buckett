@@ -163,36 +163,6 @@ public class UpdateCheckerTests
         Assert.Equal(newer, UpdateChecker.IsVersionNewer(candidate, current));
 }
 
-public class DropTargetTests
-{
-    [Fact]
-    public void RoundTripsThroughItsEncodedForm()
-    {
-        var target = new DropTarget(Guid.NewGuid(), "my-bucket");
-        var decoded = DropTarget.Decode(target.Encoded);
-        Assert.NotNull(decoded);
-        Assert.Equal(target.AccountID, decoded!.Value.AccountID);
-        Assert.Equal(target.Bucket, decoded.Value.Bucket);
-    }
-
-    [Fact]
-    public void KeepsPipesThatAppearInsideBucketNames()
-    {
-        var target = new DropTarget(Guid.NewGuid(), "odd|name");
-        Assert.Equal("odd|name", DropTarget.Decode(target.Encoded)!.Value.Bucket);
-    }
-
-    [Theory]
-    [InlineData("")]
-    [InlineData("not-a-guid|bucket")]
-    [InlineData("|bucket")]
-    public void RejectsMalformedInput(string encoded) => Assert.Null(DropTarget.Decode(encoded));
-
-    [Fact]
-    public void RejectsAnEmptyBucketName() =>
-        Assert.Null(DropTarget.Decode(Guid.NewGuid().ToString("D") + "|"));
-}
-
 public class StatsTests
 {
     [Fact]

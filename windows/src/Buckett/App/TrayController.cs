@@ -10,17 +10,15 @@ using Buckett.Views;
 
 namespace Buckett.Shell;
 
-/// The notification-area presence: an icon whose menu mirrors the macOS menu
-/// bar item (open the app, pick which buckets the drop target offers, see
-/// active transfers, quit) and which carries Buckett's system notifications.
-/// Dropping files is handled by the companion `DropPadWindow`, because Windows
-/// notification-area icons cannot accept dropped files.
+/// The notification-area presence: an icon whose menu opens the app, shows
+/// active transfers and quits, and which carries Buckett's system
+/// notifications. It does not accept dropped files — Windows notification-area
+/// icons cannot — so uploads by drag and drop go to the main window.
 public sealed class TrayController : IDisposable
 {
     public static TrayController Shared { get; } = new();
 
     private NativeTray? _tray;
-    private DropPadWindow? _dropPad;
     private string _iconStyle = "";
     private bool _iconIsLight;
 
@@ -40,12 +38,11 @@ public sealed class TrayController : IDisposable
             _tray.Activated += () => AppState.Shared.OpenMainWindow();
             Notifier.Shared.Tray = _tray;
             RefreshIcon();
-            _tray.Show("Buckett — drag files onto the desktop drop target to upload");
+            _tray.Show("Buckett");
             _tray.SetHidden(!Settings.Shared.ShowTrayIcon);
         }
 
         Settings.Shared.PropertyChanged += OnSettingsChanged;
-        SetDropTargetVisible(Settings.Shared.ShowDropTarget);
     }
 
     private void OnSettingsChanged(object? sender, PropertyChangedEventArgs e)
@@ -59,9 +56,6 @@ public sealed class TrayController : IDisposable
                     break;
                 case nameof(Settings.TrayIconStyle):
                     RefreshIcon();
-                    break;
-                case nameof(Settings.ShowDropTarget):
-                    SetDropTargetVisible(Settings.Shared.ShowDropTarget);
                     break;
             }
         });
@@ -84,36 +78,6 @@ public sealed class TrayController : IDisposable
         _iconIsLight = light;
     }
 
-    // MARK: - Desktop drop target
-
-    public void SetDropTargetVisible(bool visible)
-    {
-        try
-        {
-            if (visible)
-            {
-                if (_dropPad != null) return;
-                _dropPad = new DropPadWindow();
-                _dropPad.Closed += (_, _) => _dropPad = null;
-                _dropPad.Show();
-            }
-            else
-            {
-                _dropPad?.Close();
-                _dropPad = null;
-                DropOverlays.Shared.CloseHover();
-            }
-        }
-        catch (Exception error)
-        {
-            // A transparent, always-on-top window is the most likely thing to
-            // be refused by an unusual display setup or a remote session. That
-            // must not take the rest of the app with it.
-            Log.Warn($"drop target unavailable: {error.Message}");
-            _dropPad = null;
-        }
-    }
-
     // MARK: - Menu
 
     private List<TrayMenuItem> BuildMenu()
@@ -129,53 +93,6 @@ public sealed class TrayController : IDisposable
             },
             TrayMenuItem.Separator()
         };
-
-        var shortlist = Settings.Shared.TrayDropBuckets.ToHashSet();
-        var submenu = new List<TrayMenuItem>
-        {
-            new() { Title = "Check buckets to offer when dropping files", IsEnabled = false }
-        };
-
-        var addedAny = false;
-        foreach (var account in state.AccountStore.Accounts)
-        {
-            var buckets = state.BucketList(account.Id);
-            if (buckets.Count == 0) continue;
-
-            submenu.Add(TrayMenuItem.Separator());
-            submenu.Add(new TrayMenuItem
-            {
-                Title = account.DisplayLabel.ToUpperInvariant(),
-                IsEnabled = false
-            });
-
-            foreach (var bucket in buckets)
-            {
-                var target = new DropTarget(account.Id, bucket.Name);
-                var encoded = target.Encoded;
-                submenu.Add(new TrayMenuItem
-                {
-                    Title = BucketAliases.Shared.DisplayName(account.Id, bucket.Name),
-                    IsChecked = shortlist.Contains(encoded),
-                    Action = () => Dispatcher.UIThread.Post(() => ToggleShortlist(encoded))
-                });
-                addedAny = true;
-            }
-        }
-
-        if (!addedAny)
-        {
-            submenu.Add(new TrayMenuItem { Title = "No buckets loaded yet", IsEnabled = false });
-        }
-
-        items.Add(new TrayMenuItem { Title = "Drop Menu Buckets", Submenu = submenu });
-
-        items.Add(new TrayMenuItem
-        {
-            Title = Settings.Shared.ShowDropTarget ? "Hide Drop Target" : "Show Drop Target",
-            Action = () => Dispatcher.UIThread.Post(
-                () => Settings.Shared.ShowDropTarget = !Settings.Shared.ShowDropTarget)
-        });
 
         var active = state.Transfers.ActiveCount;
         if (active > 0)
@@ -202,13 +119,6 @@ public sealed class TrayController : IDisposable
         return items;
     }
 
-    private static void ToggleShortlist(string encoded)
-    {
-        var shortlist = Settings.Shared.TrayDropBuckets.ToList();
-        if (!shortlist.Remove(encoded)) shortlist.Add(encoded);
-        Settings.Shared.SetTrayDropBuckets(shortlist);
-    }
-
     private static void Quit()
     {
         if (Avalonia.Application.Current?.ApplicationLifetime
@@ -226,8 +136,6 @@ public sealed class TrayController : IDisposable
     public void Dispose()
     {
         Settings.Shared.PropertyChanged -= OnSettingsChanged;
-        _dropPad?.Close();
-        _dropPad = null;
         _tray?.Dispose();
         _tray = null;
     }

@@ -243,7 +243,7 @@
     <Setter Property="BoxShadow" Value="0 4 12 0 #22000000" />
   </Style>
 
-  <!-- Selectable row cards (sidebar buckets, drop targets). -->
+  <!-- Selectable row cards (sidebar buckets). -->
   <Style Selector="Border.rowCard">
     <Setter Property="Background" Value="{DynamicResource FaintFillBrush}" />
     <Setter Property="BorderBrush" Value="{DynamicResource BorderSoftBrush}" />
@@ -257,6 +257,26 @@
   <Style Selector="Border.rowCard.selected">
     <Setter Property="Background" Value="{DynamicResource ThemePrimarySoftBrush}" />
     <Setter Property="BorderBrush" Value="{DynamicResource ThemePrimaryEdgeBrush}" />
+  </Style>
+
+  <!-- Settings navigation rail: quiet rows that pick up the accent when
+       selected, rather than Fluent's full-bleed highlight bar. -->
+  <Style Selector="ListBox.nav ListBoxItem">
+    <Setter Property="Padding" Value="10,8" />
+    <Setter Property="Margin" Value="0,1" />
+    <Setter Property="CornerRadius" Value="7" />
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="ListBox.nav ListBoxItem:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource HoverFillBrush}" />
+    <Setter Property="CornerRadius" Value="7" />
+  </Style>
+  <Style Selector="ListBox.nav ListBoxItem:selected /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource ThemePrimarySoftBrush}" />
+    <Setter Property="CornerRadius" Value="7" />
+  </Style>
+  <Style Selector="ListBox.nav ListBoxItem:selected TextBlock">
+    <Setter Property="FontWeight" Value="Medium" />
   </Style>
 
   <!-- Grid tiles in the object browser. -->

@@ -12,8 +12,7 @@ public sealed class Notifier
     public enum Event
     {
         TransfersComplete,
-        TransferFailed,
-        DropStarted
+        TransferFailed
     }
 
     /// Set by the tray controller once the icon exists.
@@ -25,7 +24,6 @@ public sealed class Notifier
     {
         Event.TransfersComplete => Settings.Shared.NotifyTransfersComplete,
         Event.TransferFailed => Settings.Shared.NotifyTransferFailed,
-        Event.DropStarted => Settings.Shared.NotifyDropStarted,
         _ => false
     };
 

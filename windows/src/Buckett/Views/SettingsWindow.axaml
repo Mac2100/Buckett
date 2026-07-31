@@ -3,24 +3,70 @@
         xmlns:views="clr-namespace:Buckett.Views"
         x:Class="Buckett.Views.SettingsWindow"
         Title="Buckett Settings"
-        Width="720" Height="540"
-        MinWidth="640" MinHeight="480"
+        Width="820" Height="580"
+        MinWidth="720" MinHeight="500"
         Icon="avares://Buckett/Assets/app.ico"
         Background="{DynamicResource WindowBackgroundBrush}"
         WindowStartupLocation="CenterOwner">
 
-  <TabControl x:Name="Tabs" Padding="0">
+  <!-- Six sections down the side rather than across the top. Avalonia's default
+       tab header is 24pt with heavy padding, so six tabs wrapped onto two rows
+       and ate a third of the window before any setting appeared. A rail also
+       leaves room for the section names to be read at a glance. -->
 
-    <!-- Accounts -->
-    <TabItem Tag="Accounts">
-      <TabItem.Header>
-        <StackPanel Orientation="Horizontal" Spacing="6">
-          <views:Glyph Symbol="person.crop.circle" Size="14" VerticalAlignment="Center" />
-          <TextBlock Text="Accounts" VerticalAlignment="Center" />
-        </StackPanel>
-      </TabItem.Header>
+  <Grid ColumnDefinitions="188,Auto,*">
 
-      <Grid ColumnDefinitions="200,Auto,*">
+    <Border Grid.Column="0" Background="{DynamicResource SidebarBackgroundBrush}">
+      <DockPanel>
+        <TextBlock DockPanel.Dock="Top" Text="Settings" Classes="title3"
+                   Margin="18,16,18,10" />
+        <ListBox x:Name="Nav" Classes="nav" Background="Transparent" BorderThickness="0"
+                 Margin="8,0,8,10" SelectedIndex="0">
+          <ListBoxItem Tag="Accounts">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <views:Glyph Symbol="person.crop.circle" Size="15" VerticalAlignment="Center" />
+              <TextBlock Text="Accounts" Classes="callout" VerticalAlignment="Center" />
+            </StackPanel>
+          </ListBoxItem>
+          <ListBoxItem Tag="Appearance">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <views:Glyph Symbol="paintpalette" Size="15" VerticalAlignment="Center" />
+              <TextBlock Text="Appearance" Classes="callout" VerticalAlignment="Center" />
+            </StackPanel>
+          </ListBoxItem>
+          <ListBoxItem Tag="General">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <views:Glyph Symbol="gearshape" Size="15" VerticalAlignment="Center" />
+              <TextBlock Text="General" Classes="callout" VerticalAlignment="Center" />
+            </StackPanel>
+          </ListBoxItem>
+          <ListBoxItem Tag="Notifications">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <views:Glyph Symbol="bell.badge" Size="15" VerticalAlignment="Center" />
+              <TextBlock Text="Notifications" Classes="callout" VerticalAlignment="Center" />
+            </StackPanel>
+          </ListBoxItem>
+          <ListBoxItem Tag="Updates">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <views:Glyph Symbol="arrow.down.circle" Size="15" VerticalAlignment="Center" />
+              <TextBlock Text="Updates" Classes="callout" VerticalAlignment="Center" />
+            </StackPanel>
+          </ListBoxItem>
+          <ListBoxItem Tag="About">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <views:Glyph Symbol="info.circle" Size="15" VerticalAlignment="Center" />
+              <TextBlock Text="About" Classes="callout" VerticalAlignment="Center" />
+            </StackPanel>
+          </ListBoxItem>
+        </ListBox>
+      </DockPanel>
+    </Border>
+
+    <Border Grid.Column="1" Width="1" Background="{DynamicResource SeparatorBrush}" />
+
+    <Panel Grid.Column="2">
+      <Grid ColumnDefinitions="172,Auto,*"
+            x:Name="AccountsPage">
         <DockPanel Grid.Column="0">
           <Border DockPanel.Dock="Bottom" BorderThickness="0,1,0,0"
                   BorderBrush="{DynamicResource SeparatorBrush}">
@@ -34,7 +80,8 @@
               </Button>
             </StackPanel>
           </Border>
-          <ListBox x:Name="AccountList" Background="Transparent" BorderThickness="0">
+          <ListBox x:Name="AccountList" Classes="nav" Background="Transparent"
+                   BorderThickness="0" Margin="6,6,6,0">
             <ListBox.ItemTemplate>
               <DataTemplate>
                 <StackPanel Orientation="Horizontal" Spacing="8">
@@ -124,18 +171,9 @@
           </ScrollViewer>
         </Panel>
       </Grid>
-    </TabItem>
-
-    <!-- Appearance -->
-    <TabItem Tag="Appearance">
-      <TabItem.Header>
-        <StackPanel Orientation="Horizontal" Spacing="6">
-          <views:Glyph Symbol="paintpalette" Size="14" VerticalAlignment="Center" />
-          <TextBlock Text="Appearance" VerticalAlignment="Center" />
-        </StackPanel>
-      </TabItem.Header>
-
-      <ScrollViewer>
+      <ScrollViewer
+                 x:Name="AppearancePage"
+                 IsVisible="False">
         <StackPanel Margin="20" Spacing="18">
           <StackPanel Spacing="8">
             <TextBlock Text="Appearance" Classes="callout" FontWeight="Medium" />
@@ -146,15 +184,17 @@
 
           <StackPanel Spacing="8">
             <TextBlock Text="Theme" Classes="callout" FontWeight="Medium" />
-            <ItemsControl x:Name="ThemeHost">
+            <!-- Six themes read best as two rows of three. -->
+            <ItemsControl x:Name="ThemeHost" MaxWidth="352" HorizontalAlignment="Left">
               <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
-                  <UniformGrid Columns="3" />
+                  <WrapPanel />
                 </ItemsPanelTemplate>
               </ItemsControl.ItemsPanel>
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                  <Button Classes="plain" Margin="5" Padding="0" Click="OnPickTheme">
+                  <Button Classes="plain" Margin="0,0,10,10" Padding="0" Width="104"
+                          Click="OnPickTheme">
                     <Border CornerRadius="10" Padding="10" Background="{Binding Background}"
                             BorderBrush="{Binding Border}" BorderThickness="1">
                       <StackPanel Spacing="8">
@@ -175,16 +215,17 @@
           </StackPanel>
 
           <StackPanel Spacing="8">
-            <TextBlock Text="Drop Target Icon" Classes="callout" FontWeight="Medium" />
+            <TextBlock Text="Notification Area Icon" Classes="callout" FontWeight="Medium" />
             <ItemsControl x:Name="TrayIconHost">
               <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
-                  <UniformGrid Columns="5" />
+                  <WrapPanel />
                 </ItemsPanelTemplate>
               </ItemsControl.ItemsPanel>
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                  <Button Classes="plain" Margin="5" Padding="0" Click="OnPickTrayIcon">
+                  <Button Classes="plain" Margin="0,0,10,10" Padding="0" Width="84"
+                          Click="OnPickTrayIcon">
                     <Border CornerRadius="9" Padding="9" Background="{Binding Background}"
                             BorderBrush="{Binding Border}" BorderThickness="1">
                       <StackPanel Spacing="6">
@@ -199,22 +240,13 @@
               </ItemsControl.ItemTemplate>
             </ItemsControl>
             <TextBlock Classes="caption tertiary" TextWrapping="Wrap"
-                       Text="Used for the desktop drop target, the notification-area icon, and their animations." />
+                       Text="Shown in the notification area, next to the clock." />
           </StackPanel>
         </StackPanel>
       </ScrollViewer>
-    </TabItem>
-
-    <!-- General -->
-    <TabItem Tag="General">
-      <TabItem.Header>
-        <StackPanel Orientation="Horizontal" Spacing="6">
-          <views:Glyph Symbol="gearshape" Size="14" VerticalAlignment="Center" />
-          <TextBlock Text="General" VerticalAlignment="Center" />
-        </StackPanel>
-      </TabItem.Header>
-
-      <ScrollViewer>
+      <ScrollViewer
+                 x:Name="GeneralPage"
+                 IsVisible="False">
         <StackPanel Margin="20" Spacing="16">
           <Grid ColumnDefinitions="*,Auto">
             <TextBlock Grid.Column="0" Text="Default view" Classes="callout"
@@ -229,13 +261,15 @@
                            Increment="1" FormatString="0" Width="130" />
           </Grid>
 
+          <TextBlock Classes="caption secondary" TextWrapping="Wrap"
+                     Text="Uploads of 16 MB or more automatically use resumable multipart uploads. Interrupted uploads resume from the last completed part when retried." />
+
           <Border Classes="separator" />
 
           <StackPanel Spacing="8">
             <CheckBox x:Name="TrayIconToggle" Content="Show notification-area icon" />
-            <CheckBox x:Name="DropTargetToggle" Content="Show desktop drop target" />
             <TextBlock Classes="caption secondary" TextWrapping="Wrap"
-                       Text="Drag files onto the floating bucket to upload them instantly. Right-click the notification-area icon to pick which buckets drops go to. (Windows notification-area icons cannot receive dropped files, so Buckett provides a movable drop target instead.)" />
+                       Text="Keeps Buckett running after you close the window, and carries its notifications. With this off, closing the window quits the app." />
           </StackPanel>
 
           <Border Classes="separator" />
@@ -243,28 +277,18 @@
           <StackPanel Spacing="8">
             <CheckBox x:Name="OpenAtLoginToggle" Content="Open at login" />
             <TextBlock Classes="caption secondary" TextWrapping="Wrap"
-                       Text="Uploads of 16 MB or more automatically use resumable multipart uploads. Interrupted uploads resume from the last completed part when retried." />
+                       Text="Starts Buckett automatically when you sign in to Windows." />
           </StackPanel>
         </StackPanel>
       </ScrollViewer>
-    </TabItem>
-
-    <!-- Notifications -->
-    <TabItem Tag="Notifications">
-      <TabItem.Header>
-        <StackPanel Orientation="Horizontal" Spacing="6">
-          <views:Glyph Symbol="bell.badge" Size="14" VerticalAlignment="Center" />
-          <TextBlock Text="Notifications" VerticalAlignment="Center" />
-        </StackPanel>
-      </TabItem.Header>
-
-      <ScrollViewer>
+      <ScrollViewer
+                 x:Name="NotificationsPage"
+                 IsVisible="False">
         <StackPanel Margin="20" Spacing="14">
           <TextBlock Text="System Notifications" Classes="caption secondary"
                      FontWeight="SemiBold" />
           <CheckBox x:Name="NotifyCompleteToggle" Content="All transfers finished" />
           <CheckBox x:Name="NotifyFailedToggle" Content="A transfer fails" />
-          <CheckBox x:Name="NotifyDropToggle" Content="Drop target starts uploading" />
           <TextBlock Classes="caption secondary" TextWrapping="Wrap"
                      Text="Delivered through the notification-area icon, so Windows shows them in the Action Center. They are suppressed while the icon is hidden." />
 
@@ -274,18 +298,9 @@
           <CheckBox x:Name="ToastsToggle" Content="Show toast banners" />
         </StackPanel>
       </ScrollViewer>
-    </TabItem>
-
-    <!-- Updates -->
-    <TabItem Tag="Updates">
-      <TabItem.Header>
-        <StackPanel Orientation="Horizontal" Spacing="6">
-          <views:Glyph Symbol="arrow.down.circle" Size="14" VerticalAlignment="Center" />
-          <TextBlock Text="Updates" VerticalAlignment="Center" />
-        </StackPanel>
-      </TabItem.Header>
-
-      <ScrollViewer>
+      <ScrollViewer
+                 x:Name="UpdatesPage"
+                 IsVisible="False">
         <StackPanel Margin="20" Spacing="14">
           <Grid ColumnDefinitions="*,Auto">
             <TextBlock Grid.Column="0" Text="Current version" Classes="callout"
@@ -320,18 +335,9 @@
                   Click="OnOpenReleases" />
         </StackPanel>
       </ScrollViewer>
-    </TabItem>
-
-    <!-- About -->
-    <TabItem Tag="About">
-      <TabItem.Header>
-        <StackPanel Orientation="Horizontal" Spacing="6">
-          <views:Glyph Symbol="info.circle" Size="14" VerticalAlignment="Center" />
-          <TextBlock Text="About" VerticalAlignment="Center" />
-        </StackPanel>
-      </TabItem.Header>
-
-      <StackPanel Spacing="12" HorizontalAlignment="Center" VerticalAlignment="Center">
+      <StackPanel Spacing="12" HorizontalAlignment="Center" VerticalAlignment="Center"
+                 x:Name="AboutPage"
+                 IsVisible="False">
         <views:AppGlyph GlyphSize="64" HorizontalAlignment="Center" />
         <TextBlock Text="Buckett" Classes="title" HorizontalAlignment="Center" />
         <TextBlock x:Name="AboutVersion" Classes="secondary" HorizontalAlignment="Center" />
@@ -367,7 +373,7 @@
           </Button>
         </StackPanel>
       </StackPanel>
-    </TabItem>
+    </Panel>
 
-  </TabControl>
+  </Grid>
 </Window>

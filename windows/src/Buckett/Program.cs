@@ -29,7 +29,7 @@ internal static class Program
 
         // A second launch just brings the running copy forward. Doing this
         // before Avalonia starts keeps the duplicate from ever drawing a tray
-        // icon or a drop target.
+        // icon.
         if (!SingleInstance.TryAcquire()) return;
 
         try

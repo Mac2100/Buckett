@@ -92,22 +92,21 @@ The `accounts.json` format is identical to the macOS build's.
 
 ## How the platform pieces map
 
-Everything in the macOS feature list is present. Five things are implemented differently
+Everything in the macOS feature list is present. A few things are implemented differently
 because Windows works differently:
 
 | macOS | Windows |
 | --- | --- |
 | Keychain | Windows Credential Manager (`CredRead`/`CredWrite`, DPAPI-encrypted) |
-| Menu bar icon accepts dropped files | Windows notification-area icons **cannot** receive drops, so Buckett shows a small always-on-top **desktop drop target** you can drag anywhere. It has the same hover panel of bucket drop zones and the same drop animation. The notification-area icon keeps the menu (open, pick drop buckets, active transfers, quit) and carries notifications. |
+| Menu bar icon accepts dropped files | Windows notification-area icons **cannot** receive drops, and no equivalent is offered — drag files into the main window to upload. The notification-area icon keeps the menu (open, active transfers, settings, quit) and carries notifications. |
 | Quick Look previews | Images and text/code preview in-window; anything else (video, audio, PDF, Office…) opens in your default Windows application from the same preview window |
 | Notification Center | Notification-area balloons, which Windows 10/11 route into the Action Center |
 | DMG + in-place `.app` swap | Portable ZIP; the updater downloads it, waits for Buckett to exit, swaps the install folder, and relaunches |
 | macOS launches one instance of an app | Windows does not, so Buckett holds a named mutex: a second launch brings the running window forward and exits. Setup and uninstall watch that same mutex, so neither runs behind Buckett's back and leaves it resident. |
 
-Two smaller differences: the macOS file picker can select files *and* folders at once, so the
-**Upload** button offers "Upload Files…" and "Upload Folders…" separately (drag & drop still
-takes both together); and Windows popup menus close on click, so the drop-bucket checkboxes
-are toggled one visit at a time.
+One smaller difference: the macOS file picker can select files *and* folders at once, so the
+**Upload** button offers "Upload Files…" and "Upload Folders…" separately. Drag & drop into
+the window still takes both together.
 
 ## CI / Releases
 
@@ -136,7 +135,8 @@ release and the Windows app picks the `.zip`; neither can see the other's asset.
 ```
 windows/
   Buckett.sln
-  build/make_app.ps1            # publish + ZIP
+  build/make_app.ps1            # publish + ZIP + installer
+  build/installer.iss           # Inno Setup, per-user install
   src/Buckett/
     Models/                     # Account, RemoteObject, BucketStats, byte formatting
     Services/                   # SigV4, S3 client, transfers, credentials, updates, tray
