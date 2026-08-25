@@ -322,8 +322,20 @@ final class AppState: ObservableObject {
         analyzing.insert(key)
         defer { analyzing.remove(key) }
         do {
-            let objects = try await client.listAllObjects(bucket: bucket)
-            stats[key] = Self.computeStats(bucket: bucket, objects: objects)
+            // Versioned providers (B2 "keep all versions", S3 versioning) hide
+            // prior versions from ListObjectsV2 even though they count toward
+            // storage and billing, so walk the version listing there instead.
+            // One walk yields both the current files and the all-versions total.
+            if account.provider.supportsVersionListing,
+               let listing = try? await client.listVersionInventory(bucket: bucket) {
+                var computed = Self.computeStats(bucket: bucket, objects: listing.currentObjects)
+                computed.versionCount = listing.versionCount
+                computed.versionSize = listing.versionSize
+                stats[key] = computed
+            } else {
+                let objects = try await client.listAllObjects(bucket: bucket)
+                stats[key] = Self.computeStats(bucket: bucket, objects: objects)
+            }
         } catch {
             NSLog("Buckett: analyze failed for \(bucket): \(error.localizedDescription)")
         }

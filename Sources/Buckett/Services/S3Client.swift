@@ -23,6 +23,15 @@ struct ListResult {
     var nextContinuationToken: String?
 }
 
+/// Result of walking every stored object version in a bucket.
+struct VersionedListing {
+    /// The latest visible version of each key (folder markers flagged, not removed).
+    var currentObjects: [RemoteObject]
+    /// Every stored version, current and hidden. Folder markers excluded.
+    var versionCount: Int
+    var versionSize: Int64
+}
+
 /// S3-compatible REST client (Cloudflare R2, Backblaze B2, AWS S3, MinIO…)
 /// using path-style addressing and SigV4 request signing.
 final class S3Client {
@@ -308,6 +317,61 @@ final class S3Client {
             token = page.isTruncated ? page.nextContinuationToken : nil
         } while token != nil
         return all
+    }
+
+    /// Walks every stored object version (GET ?versions) for analytics,
+    /// following pagination. Versioned providers (B2 with "keep all versions",
+    /// S3 with versioning) retain hidden prior versions that ListObjectsV2
+    /// never returns but that still count toward storage and billing.
+    /// (Distinct from `listAllObjectVersions`, which collects keys/version IDs
+    /// for bucket emptying.)
+    func listVersionInventory(bucket: String) async throws -> VersionedListing {
+        var current: [RemoteObject] = []
+        var versionCount = 0
+        var versionSize: Int64 = 0
+        var keyMarker: String?
+        var versionMarker: String?
+        var more = true
+        while more {
+            try Task.checkCancellation()
+            var query: [(String, String?)] = [("versions", nil), ("max-keys", "1000")]
+            if let keyMarker { query.append(("key-marker", keyMarker)) }
+            if let versionMarker { query.append(("version-id-marker", versionMarker)) }
+            let request = try buildRequest(method: "GET", bucket: bucket, query: query)
+            let (data, _) = try await send(request)
+            guard let root = XMLTree.parse(data) else { break }
+
+            for node in root.all("Version") {
+                guard let key = node["Key"]?.trimmedText, !key.isEmpty else { continue }
+                let size = Int64(node["Size"]?.trimmedText ?? "") ?? 0
+                let isFolderMarker = key.hasSuffix("/") && size == 0
+                if !isFolderMarker {
+                    versionCount += 1
+                    versionSize += size
+                }
+                guard node["IsLatest"]?.trimmedText == "true" else { continue }
+                var object = RemoteObject(key: key)
+                object.size = size
+                object.lastModified = (node["LastModified"]?.trimmedText).flatMap(S3Date.parse)
+                object.eTag = node["ETag"]?.trimmedText.replacingOccurrences(of: "\"", with: "")
+                object.storageClass = node["StorageClass"]?.trimmedText
+                object.isFolder = isFolderMarker
+                current.append(object)
+            }
+
+            more = root["IsTruncated"]?.trimmedText == "true"
+            let nextKey = root["NextKeyMarker"]?.trimmedText ?? ""
+            let nextVersion = root["NextVersionIdMarker"]?.trimmedText ?? ""
+            keyMarker = nextKey.isEmpty ? nil : nextKey
+            versionMarker = nextVersion.isEmpty ? nil : nextVersion
+            // A truncated page must carry a marker; stop rather than loop forever.
+            if more, keyMarker == nil, versionMarker == nil { more = false }
+        }
+        return VersionedListing(
+            currentObjects: current,
+            versionCount: versionCount,
+            versionSize: versionSize
+        )
     }
 
     // MARK: - Objects

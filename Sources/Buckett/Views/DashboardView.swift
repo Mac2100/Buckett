@@ -61,6 +61,10 @@ struct DashboardView: View {
         }
     }
 
+    private var hiddenVersionTotal: Int64 {
+        analyzedStats.reduce(Int64(0)) { $0 + $1.hiddenVersionSize }
+    }
+
     private var summaryRow: some View {
         HStack(spacing: 16) {
             StatTile(
@@ -68,6 +72,13 @@ struct DashboardView: View {
                 value: analyzedStats.reduce(Int64(0)) { $0 + $1.totalSize }.formattedBytes,
                 symbol: "externaldrive.fill"
             )
+            if hiddenVersionTotal > 0 {
+                StatTile(
+                    title: "Incl. Hidden Versions",
+                    value: analyzedStats.reduce(Int64(0)) { $0 + $1.billedSize }.formattedBytes,
+                    symbol: "clock.arrow.circlepath"
+                )
+            }
             StatTile(
                 title: "Objects",
                 value: "\(analyzedStats.reduce(0) { $0 + $1.objectCount })",
@@ -175,6 +186,9 @@ struct BucketCard: View {
             if let stats {
                 HStack(spacing: 16) {
                     metric(stats.formattedSize, "Total size")
+                    if stats.hasHiddenVersions {
+                        metric(stats.billedSize.formattedBytes, "All versions")
+                    }
                     metric("\(stats.objectCount)", "Objects")
                     if let newest = stats.newestModified {
                         metric(newest.formatted(.relative(presentation: .named)), "Last change")
