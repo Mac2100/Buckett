@@ -67,7 +67,11 @@ struct StatisticsView: View {
             statCard(
                 title: "Storage",
                 value: stats?.formattedSize ?? "—",
-                caption: stats.map { "Total \($0.objectCount) files" } ?? "Run analyze",
+                caption: stats.map { s in
+                    s.hasHiddenVersions
+                        ? "\(s.billedSize.formattedBytes) incl. \(s.hiddenVersionCount) hidden version\(s.hiddenVersionCount == 1 ? "" : "s")"
+                        : "Total \(s.objectCount) files"
+                } ?? "Run analyze",
                 symbol: "internaldrive.fill",
                 color: theme.secondary
             )
@@ -80,8 +84,10 @@ struct StatisticsView: View {
             )
             statCard(
                 title: "Est. Monthly Cost",
-                value: stats.map { costString(bytes: $0.totalSize) } ?? "—",
-                caption: "Storage only, after free tier",
+                value: stats.map { costString(bytes: $0.billedSize) } ?? "—",
+                caption: stats?.hasHiddenVersions == true
+                    ? "Incl. hidden versions, after free tier"
+                    : "Storage only, after free tier",
                 symbol: "dollarsign.circle.fill",
                 color: .green
             )

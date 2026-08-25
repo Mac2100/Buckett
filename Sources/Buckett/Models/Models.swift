@@ -34,6 +34,15 @@ enum Provider: String, Codable, CaseIterable, Identifiable {
         }
     }
 
+    /// Whether the provider's S3 API supports `ListObjectVersions`. Cloudflare
+    /// R2 keeps no hidden versions, so the plain listing is already complete.
+    var supportsVersionListing: Bool {
+        switch self {
+        case .cloudflareR2: return false
+        case .backblazeB2, .amazonS3: return true
+        }
+    }
+
     var consoleURL: URL {
         switch self {
         case .cloudflareR2: return URL(string: "https://dash.cloudflare.com/?to=/:account/r2")!
@@ -190,6 +199,18 @@ struct BucketStats {
     var largestObjects: [RemoteObject]
     var newestModified: Date?
     var analyzedAt: Date
+    /// All-versions totals (hidden prior versions included) — what versioned
+    /// providers actually store and bill. nil when the provider keeps no
+    /// versions or the version listing failed.
+    var versionCount: Int? = nil
+    var versionSize: Int64? = nil
+
+    /// Size the provider stores and bills for: all versions when known,
+    /// otherwise the current files.
+    var billedSize: Int64 { versionSize ?? totalSize }
+    var hiddenVersionCount: Int { max(0, (versionCount ?? objectCount) - objectCount) }
+    var hiddenVersionSize: Int64 { max(0, (versionSize ?? totalSize) - totalSize) }
+    var hasHiddenVersions: Bool { hiddenVersionCount > 0 || hiddenVersionSize > 0 }
 
     var formattedSize: String {
         ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file)
