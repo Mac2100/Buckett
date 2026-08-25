@@ -319,11 +319,13 @@ final class S3Client {
         return all
     }
 
-    /// Walks every stored object version (GET ?versions), following pagination.
-    /// Versioned providers (B2 with "keep all versions", S3 with versioning)
-    /// retain hidden prior versions that ListObjectsV2 never returns but that
-    /// still count toward storage and billing.
-    func listAllObjectVersions(bucket: String, prefix: String = "") async throws -> VersionedListing {
+    /// Walks every stored object version (GET ?versions) for analytics,
+    /// following pagination. Versioned providers (B2 with "keep all versions",
+    /// S3 with versioning) retain hidden prior versions that ListObjectsV2
+    /// never returns but that still count toward storage and billing.
+    /// (Distinct from `listAllObjectVersions`, which collects keys/version IDs
+    /// for bucket emptying.)
+    func listVersionInventory(bucket: String) async throws -> VersionedListing {
         var current: [RemoteObject] = []
         var versionCount = 0
         var versionSize: Int64 = 0
@@ -333,7 +335,6 @@ final class S3Client {
         while more {
             try Task.checkCancellation()
             var query: [(String, String?)] = [("versions", nil), ("max-keys", "1000")]
-            if !prefix.isEmpty { query.append(("prefix", prefix)) }
             if let keyMarker { query.append(("key-marker", keyMarker)) }
             if let versionMarker { query.append(("version-id-marker", versionMarker)) }
             let request = try buildRequest(method: "GET", bucket: bucket, query: query)

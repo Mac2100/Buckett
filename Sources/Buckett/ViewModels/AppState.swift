@@ -327,7 +327,7 @@ final class AppState: ObservableObject {
             // storage and billing, so walk the version listing there instead.
             // One walk yields both the current files and the all-versions total.
             if account.provider.supportsVersionListing,
-               let listing = try? await client.listAllObjectVersions(bucket: bucket) {
+               let listing = try? await client.listVersionInventory(bucket: bucket) {
                 var computed = Self.computeStats(bucket: bucket, objects: listing.currentObjects)
                 computed.versionCount = listing.versionCount
                 computed.versionSize = listing.versionSize
